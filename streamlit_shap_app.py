@@ -98,21 +98,21 @@ st.write(new_row.T)
 
 st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
-
 def make_explainer(model, background_df):
     """
-    Crea un explainer de SHAP para un modelo XGBoost.
-    Solo usa columnas numéricas del background para evitar errores.
+    Crea un KernelExplainer para cualquier modelo (incluyendo XGBoost o pipelines complejos).
+    Usa solo una muestra pequeña del background para ahorrar tiempo.
     """
     try:
-        # Filtrar solo columnas numéricas
-        background_numeric = background_df.select_dtypes(include=[np.number])
-        if background_numeric.shape[1] == 0:
-            raise ValueError("El background no contiene columnas numéricas.")
-        
-        # Crear TreeExplainer para XGBoost
-        expl = shap.TreeExplainer(model, data=background_numeric)
-        return expl, background_numeric
+        # Sample del background para KernelExplainer
+        background_sample = background_df.sample(min(100, len(background_df)), random_state=42)
+
+        # Función de predicción compatible
+        f = lambda x: model.predict_proba(x)[:, 1]
+
+        # Crear KernelExplainer
+        explainer = shap.KernelExplainer(f, background_sample)
+        return explainer, background_sample
     except Exception as e:
         raise RuntimeError(f"No se pudo crear el explainer de SHAP: {e}")
 
