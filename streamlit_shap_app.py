@@ -7,6 +7,11 @@ from io import BytesIO
 import requests
 import streamlit as st
 import dill
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
 
