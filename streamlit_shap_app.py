@@ -98,6 +98,106 @@ st.write(new_row.T)
 
 st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import shap
+import plotly.graph_objects as go
+from io import BytesIO
+import requests
+
+st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
+
+st.title("What‑if SHAP Explorer — App Streamlit")
+st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinidas en GitHub.")
+
+# CONFIGURA AQUÍ LAS URLS RAW DE GITHUB
+CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
+MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/mejor_modelo_con_umbral_20251015.pkl"
+
+@st.cache_data
+def fetch_url(url):
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.content
+
+@st.cache_data
+def load_df_from_bytes(bts):
+    return pd.read_csv(BytesIO(bts))
+
+@st.cache_data
+def load_model_from_bytes(bts):
+    return pickle.loads(bts)
+
+try:
+    csv_bytes = fetch_url(CSV_URL)
+    df = load_df_from_bytes(csv_bytes)
+    st.success(f"CSV cargado correctamente desde GitHub: {CSV_URL}")
+except Exception as e:
+    st.error(f"Error cargando CSV desde {CSV_URL}: {e}")
+    st.stop()
+
+try:
+    model_bytes = fetch_url(MODEL_URL)
+    model = load_model_from_bytes(model_bytes)
+    st.success(f"Modelo cargado correctamente desde GitHub: {MODEL_URL}")
+except Exception as e:
+    st.error(f"Error cargando modelo desde {MODEL_URL}: {e}")
+    st.stop()
+
+features = df.columns.tolist()
+
+st.sidebar.header("Configuración")
+
+bg_size = st.sidebar.slider("Tamaño muestra background (para explainer)", min_value=10, max_value=min(500, len(df)), value=min(100, len(df)))
+background = df.sample(bg_size, random_state=42)
+
+row_selector = st.sidebar.selectbox("Selecciona cliente por índice (posición en el CSV)", options=list(range(len(df))))
+
+base_row = df.iloc[row_selector:row_selector+1].copy()
+st.write("### Cliente actual (valores)")
+st.write(base_row.T)
+
+st.write("### Controles What‑If — modifica los valores y observa el efecto")
+col1, col2 = st.columns(2)
+new_row = base_row.copy()
+
+numeric_cols = new_row.select_dtypes(include=[np.number]).columns.tolist()
+cat_cols = [c for c in features if c not in numeric_cols]
+
+with col1:
+    st.subheader("Numéricos")
+    for c in numeric_cols:
+        col_min = float(df[c].quantile(0.01))
+        col_max = float(df[c].quantile(0.99))
+        col_val = float(base_row.iloc[0][c])
+        delta = max(abs(col_val)*0.5, 1.0)
+        v_min = min(col_min, col_val - delta)
+        v_max = max(col_max, col_val + delta)
+        step = (v_max-v_min)/100 if v_max>v_min else 1.0
+        new_val = st.slider(c, min_value=v_min, max_value=v_max, value=col_val, step=step)
+        new_row.at[new_row.index[0], c] = new_val
+
+with col2:
+    st.subheader("Categorías / Otros")
+    for c in cat_cols:
+        uniques = df[c].dropna().unique().tolist()
+        try:
+            default = base_row.iloc[0][c]
+        except Exception:
+            default = uniques[0] if len(uniques)>0 else ""
+        if len(uniques) <= 20 and len(uniques) > 0:
+            new_val = st.selectbox(c, options=uniques, index=uniques.index(default) if default in uniques else 0)
+        else:
+            new_val = st.text_input(f"{c} (valor)", value=str(default))
+        new_row.at[new_row.index[0], c] = new_val
+
+st.write("### Valores modificados")
+st.write(new_row.T)
+
+st.write("---")
+st.header("Predicción y explicabilidad (SHAP)")
 def make_explainer(model, background_df):
     """
     Crea un KernelExplainer para cualquier modelo (incluyendo XGBoost o pipelines complejos).
@@ -177,6 +277,24 @@ shap_df["abs_shap"] = shap_df["shap_value"].abs()
 shap_df = shap_df.sort_values("abs_shap", ascending=False)
 st.subheader("Contribuciones (top features)")
 st.dataframe(shap_df.reset_index(drop=True))
+
+st.write("---")
+st.info("Recuerda: pickles pueden ejecutar código arbitrario. Solo usa modelos de orígenes de confianza.")
+
+st.write("### Exportar muestra modificada")
+buf = BytesIO()
+new_row.to_csv(buf, index=False)
+buf.seek(0)
+st.download_button("Descargar fila modificada (CSV)", data=buf, file_name="cliente_modificado.csv", mime="text/csv")
+
+st.markdown(
+    """
+    **Consejos de despliegue**:\n
+    - Ajusta las URLs `CSV_URL` y `MODEL_URL` al principio del script para apuntar a tus archivos en GitHub (en formato *raw*).\n
+    - Añade este fichero y un `requirements.txt` con las dependencias (streamlit, pandas, shap, plotly, scikit-learn, requests) a tu repositorio.\n
+    - Despliega directamente en Streamlit Cloud.
+    """
+)
 
 st.write("---")
 st.info("Recuerda: pickles pueden ejecutar código arbitrario. Solo usa modelos de orígenes de confianza.")
