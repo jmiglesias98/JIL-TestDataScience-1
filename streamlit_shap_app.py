@@ -100,27 +100,34 @@ st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
 def make_explainer(model, background_df):
     """
-    Crea un KernelExplainer para cualquier modelo (incluyendo XGBoost o pipelines complejos).
-    Usa solo una muestra pequeña del background para ahorrar tiempo.
+    Crea un KernelExplainer para modelos ya entrenados con datos numéricos.
     """
     try:
-        # Sample del background para KernelExplainer
+        # Asegura que no hay NaN y que todo es numérico
+        background_df = background_df.select_dtypes(include=[np.number]).fillna(0)
+
+        # Usa una muestra para velocidad
         background_sample = background_df.sample(min(100, len(background_df)), random_state=42)
 
-        # Función de predicción compatible
-        f = lambda x: model.predict_proba(x)[:, 1]
+        # Función predictiva segura
+        if hasattr(model, "predict_proba"):
+            f = lambda x: model.predict_proba(pd.DataFrame(x, columns=background_sample.columns))[:, 1]
+        else:
+            f = lambda x: model.predict(pd.DataFrame(x, columns=background_sample.columns))
 
-        # Crear KernelExplainer
+        # Crear explainer
         explainer = shap.KernelExplainer(f, background_sample)
         return explainer, background_sample
+
     except Exception as e:
+        st.error(f"Error detallado al crear el explainer: {e}")
         raise RuntimeError(f"No se pudo crear el explainer de SHAP: {e}")
 
 with st.spinner("Creando explainer y calculando SHAP..."):
     explainer, background_sample = make_explainer(model, background)
 
 # Convertir la fila de entrada a DataFrame compatible
-X_input = new_row[background_sample.columns]
+X_input = new_row[background_sample.columns].select_dtypes(include=[np.number]).fillna(0)
 
 # Calcular valores SHAP (puedes ajustar nsamples para velocidad)
 shap_vals = explainer.shap_values(X_input, nsamples=100)[0]  # si X_input tiene una fila
