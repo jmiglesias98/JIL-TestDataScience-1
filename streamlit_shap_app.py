@@ -189,65 +189,42 @@ st.write("### 🧮 Valores modificados")
 st.write(new_row.T)
 
 # ============================================================
-# 🧩 Predicción y SHAP — CORREGIDO FINAL
+# 🧩 Predicción y SHAP — VERSIÓN FINAL USANDO PIPELINE COMPLETO
 # ============================================================
 
-# ============================================================
-# 🧩 Predicción y SHAP — VERSIÓN FINAL ROBUSTA
-# ============================================================
+# ⚙️ Usar el pipeline completo (no separar preprocesador)
+background = df.sample(min(100, len(df)), random_state=42)
 
-try:
-    cleaner = modelo_pipeline.named_steps.get('cleaner')
-    preprocessor = modelo_pipeline.named_steps.get('preprocessor')
-    model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
-except Exception:
-    st.error("❌ No se encontraron pasos 'cleaner' o 'preprocessor' en el pipeline.")
-    st.stop()
-
-# 1️⃣ Background (en el mismo espacio que el modelo espera)
-background_raw = df.sample(min(100, len(df)), random_state=42)
-background_clean = cleaner.transform(background_raw)
-background_preprocessed = preprocessor.transform(background_clean)
-
-if hasattr(background_preprocessed, "values"):
-    background_array = background_preprocessed.values
-else:
-    background_array = background_preprocessed
-
-# 2️⃣ Preparar la fila de entrada del usuario
-X_input = new_row.copy()
-X_input_clean = cleaner.transform(X_input)
-X_input_preprocessed = preprocessor.transform(X_input_clean)
-
-if hasattr(X_input_preprocessed, "values"):
-    X_input_array = X_input_preprocessed.values
-else:
-    X_input_array = X_input_preprocessed
-
-# 3️⃣ Calcular predicción
-y_pred_proba = model.predict_proba(X_input_array)[0, 1]
+# Predicción
+y_pred_proba = modelo_pipeline.predict_proba(new_row)[0, 1]
 st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
 
-# 4️⃣ Usar SHAP.Explainer (automático y seguro)
-with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.Explainer(model, background_array)
-    shap_values = explainer(X_input_array)
+# Crear explainer directamente sobre el pipeline
+with st.spinner("🧠 Calculando valores SHAP (esto puede tardar unos segundos)..."):
+    explainer = shap.Explainer(modelo_pipeline, background, feature_names=df.columns)
+    shap_values = explainer(new_row)
 
-# 5️⃣ Mostrar resumen
+# Base value
 base_value = explainer.expected_value
-st.write(f"Base value: {base_value}")
+st.write(f"Base value (modelo): {base_value}")
 
-# 6️⃣ Gráfico Waterfall (Plotly)
+# Obtener nombres y valores SHAP
 vals = shap_values.values[0]
-feat_names = explainer.feature_names if hasattr(explainer, "feature_names") else [f"f{i}" for i in range(len(vals))]
+feat_names = df.columns.tolist()
 
+# Mostrar top-k variables
 order = np.argsort(np.abs(vals))[::-1]
-top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)",
-                          min_value=3, max_value=min(50, len(feat_names)), value=min(10, len(feat_names)))
+top_k = st.sidebar.slider(
+    "Número de features a mostrar (top K por impacto)",
+    min_value=3,
+    max_value=min(50, len(feat_names)),
+    value=min(10, len(feat_names))
+)
 
 ordered_feats = [feat_names[i] for i in order[:top_k]]
 ordered_vals = [vals[i] for i in order[:top_k]]
 
+# Plotly Waterfall
 x = ["Base value"] + ordered_feats + ["Prediction"]
 measures = ["absolute"] + ["relative"] * len(ordered_vals) + ["total"]
 y = [base_value] + ordered_vals + [None]
@@ -263,3 +240,4 @@ fig = go.Figure(go.Waterfall(
 ))
 fig.update_layout(title_text=f"Waterfall de contribuciones SHAP (top {top_k})", waterfallgroupgap=0.5)
 st.plotly_chart(fig, use_container_width=True)
+
