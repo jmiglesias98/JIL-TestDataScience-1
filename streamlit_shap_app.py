@@ -99,7 +99,6 @@ st.write(new_row.T)
 st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
 
-@st.cache_resource  # usar cache_resource para objetos no hashables
 def make_explainer(model, background_df):
     """
     Crea un explainer de SHAP para un modelo XGBoost.
