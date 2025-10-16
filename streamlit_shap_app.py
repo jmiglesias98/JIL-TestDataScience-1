@@ -9,10 +9,14 @@ from io import BytesIO
 import requests
 import shap
 import plotly.graph_objects as go
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
-
-st.title("What‑if SHAP Explorer — App Streamlit")
+st.title("What-if SHAP Explorer — App Streamlit")
 st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinidas en GitHub.")
 
 # ============================================================
@@ -21,23 +25,9 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
 MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.joblib"
 
-import pandas as pd
-import numpy as np
-import streamlit as st
-import joblib
-import shap
-import plotly.graph_objects as go
-from io import BytesIO
-import requests
-
-# Importar tus clases personalizadas
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-
-# === DataCleaner y PreprocesadorDinamico ===
+# ============================================================
+# 🧹 Clases personalizadas
+# ============================================================
 class DataCleaner(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.categorical_cols = {
@@ -68,6 +58,7 @@ class DataCleaner(BaseEstimator, TransformerMixin):
                           else (mode_value if val not in allowed_values else val))
                 )
         return df
+
 
 class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
     def __init__(self, cols_to_drop_after_ohe=None):
@@ -126,17 +117,17 @@ def load_model_from_bytes(bts):
 try:
     csv_bytes = fetch_url(CSV_URL)
     df = load_df_from_bytes(csv_bytes)
-    st.success(f"CSV cargado correctamente desde GitHub: {CSV_URL}")
+    st.success(f"✅ CSV cargado correctamente desde GitHub: {CSV_URL}")
 except Exception as e:
-    st.error(f"Error cargando CSV: {e}")
+    st.error(f"❌ Error cargando CSV: {e}")
     st.stop()
 
 try:
     model_bytes = fetch_url(MODEL_URL)
     modelo_pipeline = load_model_from_bytes(model_bytes)
-    st.success(f"Modelo cargado correctamente desde GitHub: {MODEL_URL}")
+    st.success(f"✅ Modelo cargado correctamente desde GitHub: {MODEL_URL}")
 except Exception as e:
-    st.error(f"Error cargando modelo: {e}")
+    st.error(f"❌ Error cargando modelo: {e}")
     st.stop()
 
 features = df.columns.tolist()
@@ -144,12 +135,19 @@ features = df.columns.tolist()
 # ============================================================
 # 🛠️ Configuración de la app
 # ============================================================
-st.sidebar.header("Configuración")
+st.sidebar.header("⚙️ Configuración")
 
-bg_size = st.sidebar.slider("Tamaño muestra background (para explainer)", min_value=10, max_value=min(500, len(df)), value=min(100, len(df)))
+bg_size = st.sidebar.slider(
+    "Tamaño muestra background (para explainer)",
+    min_value=10, max_value=min(500, len(df)),
+    value=min(100, len(df))
+)
 background = df.sample(bg_size, random_state=42)
 
-row_selector = st.sidebar.selectbox("Selecciona cliente por índice (posición en el CSV)", options=list(range(len(df))))
+row_selector = st.sidebar.selectbox(
+    "Selecciona cliente por índice (posición en el CSV)",
+    options=list(range(len(df)))
+)
 base_row = df.iloc[row_selector:row_selector+1].copy()
 
 st.write("### Cliente actual (valores)")
@@ -164,7 +162,7 @@ numeric_cols = new_row.select_dtypes(include=[np.number]).columns.tolist()
 cat_cols = [c for c in features if c not in numeric_cols]
 
 with col1:
-    st.subheader("Numéricos")
+    st.subheader("🔢 Numéricos")
     for c in numeric_cols:
         col_min = float(df[c].quantile(0.01))
         col_max = float(df[c].quantile(0.99))
@@ -177,7 +175,7 @@ with col1:
         new_row.at[new_row.index[0], c] = new_val
 
 with col2:
-    st.subheader("Categorías / Otros")
+    st.subheader("🏷️ Categóricas / Otros")
     for c in cat_cols:
         uniques = df[c].dropna().unique().tolist()
         default = base_row.iloc[0][c] if c in base_row.columns else (uniques[0] if uniques else "")
@@ -187,39 +185,39 @@ with col2:
             new_val = st.text_input(f"{c} (valor)", value=str(default))
         new_row.at[new_row.index[0], c] = new_val
 
-st.write("### Valores modificados")
+st.write("### 🧮 Valores modificados")
 st.write(new_row.T)
 
 # ============================================================
-# 🧩 Predicción y SHAP
+# 🧩 Predicción y SHAP — CORREGIDO
 # ============================================================
-# ============================================================
-# 🔹 Bloque SHAP y predicción
-# ============================================================
-import shap
 
-# Función de predicción usando la pipeline completa
+# --- Función robusta para predicción ---
 def model_predict(X):
+    # SHAP puede pasar arrays; convertirlos a DataFrame con nombres originales
+    if isinstance(X, np.ndarray):
+        try:
+            X = pd.DataFrame(X, columns=features)
+        except Exception:
+            X = pd.DataFrame(X)
     return modelo_pipeline.predict_proba(X)[:, 1]
 
-# Crear background_df con la pipeline (solo preprocesamiento)
+# --- Background del explainer (mismo formato que usa model_predict) ---
 background_raw = df.sample(min(100, len(df)), random_state=42)
-background_df = modelo_pipeline.named_steps['preprocessor'].transform(
-    modelo_pipeline.named_steps['cleaner'].transform(background_raw)
-)
+background_for_explainer = background_raw.copy()
 
-# Crear explainer
-with st.spinner("Creando explainer y calculando SHAP..."):
-    explainer = shap.KernelExplainer(model_predict, background_df)
+with st.spinner("🧠 Creando explainer y calculando SHAP..."):
+    explainer = shap.KernelExplainer(model_predict, background_for_explainer)
 
-# Preparar fila modificada para predicción
+# --- Calcular SHAP para el cliente modificado ---
 X_input = new_row.copy()
+if isinstance(X_input, np.ndarray):
+    X_input = pd.DataFrame(X_input, columns=features)
 
-# Calcular valores SHAP
 shap_values = explainer.shap_values(X_input, nsamples=100)
 base_value = explainer.expected_value
 
-# Calcular probabilidad de clase 1
+# --- Predicción del modelo ---
 try:
     y_pred_proba = modelo_pipeline.predict_proba(X_input)[0][1]
 except Exception:
@@ -228,11 +226,23 @@ except Exception:
 st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4) if y_pred_proba is not None else "Error"))
 st.write(f"Base value (modelo): {base_value}")
 
-# Mostrar waterfall de SHAP
-feat_names = modelo_pipeline.named_steps['preprocessor'].ct.get_feature_names_out().tolist()
-vals = shap_values[0].tolist()
+# --- Obtener nombres de features de forma robusta ---
+try:
+    feat_names = modelo_pipeline.named_steps['preprocessor'].ct.get_feature_names_out().tolist()
+except Exception:
+    try:
+        processed_example = modelo_pipeline.named_steps['preprocessor'].transform(
+            modelo_pipeline.named_steps['cleaner'].transform(df.head(1))
+        )
+        feat_names = processed_example.columns.tolist() if hasattr(processed_example, "columns") else [f"f{i}" for i in range(processed_example.shape[1])]
+    except Exception:
+        feat_names = features
+
+# --- Crear gráfico tipo Waterfall ---
+vals = shap_values[0].tolist() if isinstance(shap_values, (list, tuple)) else shap_values.tolist()
 order = np.argsort(np.abs(vals))[::-1]
-top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)", min_value=3, max_value=min(50, len(feat_names)), value=min(10, len(feat_names)))
+top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)",
+                          min_value=3, max_value=min(50, len(feat_names)), value=min(10, len(feat_names)))
 
 ordered_feats = [feat_names[i] for i in order[:top_k]]
 ordered_vals = [vals[i] for i in order[:top_k]]
@@ -256,10 +266,10 @@ st.plotly_chart(fig, use_container_width=True)
 # ============================================================
 # 💾 Exportar fila modificada
 # ============================================================
-from io import BytesIO
 buf = BytesIO()
 new_row.to_csv(buf, index=False)
 buf.seek(0)
-st.download_button("Descargar fila modificada (CSV)", data=buf, file_name="cliente_modificado.csv", mime="text/csv")
+st.download_button("💾 Descargar fila modificada (CSV)", data=buf, file_name="cliente_modificado.csv", mime="text/csv")
 
-st.info("Pickles o joblibs pueden ejecutar código arbitrario. Solo usa modelos de confianza.")
+st.info("⚠️ Pickles o joblibs pueden ejecutar código arbitrario. Solo usa modelos de confianza.")
+
