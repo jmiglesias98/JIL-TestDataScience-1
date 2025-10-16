@@ -5,3 +5,4 @@ scikit-learn
 shap
 xgboost
 plotly
+dill
