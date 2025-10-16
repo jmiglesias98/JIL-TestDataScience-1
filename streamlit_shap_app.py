@@ -30,7 +30,7 @@ def fetch_url(url):
 
 @st.cache_data
 def load_df_from_bytes(bts):
-    return pd.read_csv(BytesIO(bts))
+    return pd.read_csv(BytesIO(bts), sep = ";)
 
 class DataCleaner(BaseEstimator, TransformerMixin):
     def __init__(self):
