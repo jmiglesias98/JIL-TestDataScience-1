@@ -99,25 +99,32 @@ st.write(new_row.T)
 st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
 
+@st.cache_resource  # usar cache_resource para objetos no hashables
 def make_explainer(model, background_df):
+    """
+    Crea un explainer de SHAP para un modelo XGBoost.
+    Solo usa columnas numéricas del background para evitar errores.
+    """
     try:
-        expl = shap.Explainer(model, background_df, feature_names=background_df.columns.tolist())
-        return expl
+        # Filtrar solo columnas numéricas
+        background_numeric = background_df.select_dtypes(include=[np.number])
+        if background_numeric.shape[1] == 0:
+            raise ValueError("El background no contiene columnas numéricas.")
+        
+        # Crear TreeExplainer para XGBoost
+        expl = shap.TreeExplainer(model, data=background_numeric)
+        return expl, background_numeric
     except Exception as e:
-        try:
-            expl = shap.Explainer(model, background_df.sample(min(50, len(background_df)), random_state=1))
-            return expl
-        except Exception as e2:
-            raise RuntimeError(f"No se pudo crear explainer automáticamente: {e} | {e2}")
+        raise RuntimeError(f"No se pudo crear el explainer de SHAP: {e}")
 
-with st.spinner("Creando explainer y calculando SHAP... esto puede tardar unos segundos"):
-    explainer = make_explainer(model, background)
+with st.spinner("Creando explainer y calculando SHAP..."):
+    explainer, background_numeric = make_explainer(model, background)
 
-X_input = new_row[explainer.feature_names]
-
-explanation = explainer(X_input)
-base_value = float(explanation.base_values[0])
+# Para la fila de entrada
+X_input_numeric = new_row[background_numeric.columns]
+explanation = explainer(X_input_numeric)
 shap_vals = explanation.values[0]
+base_value = explanation.base_values[0]
 
 try:
     if hasattr(model, 'predict_proba'):
