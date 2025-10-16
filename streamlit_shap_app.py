@@ -16,6 +16,49 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
 MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.pkl"
 
+class DataCleaner(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.categorical_cols = {
+            "job": ["admin.", "unknown", "unemployed", "management", "housemaid",
+                    "entrepreneur", "student", "blue-collar", "self-employed",
+                    "retired", "technician", "services"],
+            "marital": ["married","divorced","single"],
+            "education": ["unknown","secondary","primary","tertiary"],
+            "default": ["yes","no"],
+            "housing": ["yes","no"],
+            "loan": ["yes","no"],
+            "contact": ["unknown","telephone","cellular"],
+            "month": ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"],
+            "poutcome": ["unknown","other","failure","success"]
+        }
+
+class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
+    def __init__(self, cols_to_drop_after_ohe=None):
+        self.cols_to_drop_after_ohe = cols_to_drop_after_ohe
+        self.ct = None
+
+    def fit(self, X, y=None):
+        num_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
+
+        num_transformer = Pipeline(steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler())
+        ])
+
+        cat_transformer = Pipeline(steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ohe", OneHotEncoder(drop="first", handle_unknown="ignore", sparse_output=False))
+        ])
+
+        self.ct = ColumnTransformer(transformers=[
+            ("num", num_transformer, num_cols),
+            ("cat", cat_transformer, cat_cols)
+        ])
+
+        self.ct.fit(X)
+        return self
+
 @st.cache_data
 def fetch_url(url):
     r = requests.get(url)
