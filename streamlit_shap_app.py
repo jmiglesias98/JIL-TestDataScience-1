@@ -159,13 +159,22 @@ st.write(new_row.T)
 
 # === SHAP Explainer ===
 st.header("Predicción y SHAP")
-try:
-    explainer = shap.Explainer(modelo_pipeline.predict_proba, background)
-    shap_values = explainer(new_row)
-    base_value = explainer.expected_value[1] if isinstance(explainer.expected_value, np.ndarray) else explainer.expected_value
-except Exception as e:
-    st.error(f"Error al crear explainer: {e}")
-    st.stop()
+
+# Crear función predictiva que recibe DataFrame y devuelve probabilidades
+def model_predict(df):
+    # KernelExplainer requiere salida numérica
+    return modelo_pipeline.predict_proba(df)[:, 1]
+
+# Background numérico: aplicar pipeline a una muestra y quedarnos con valores numéricos
+background_num = modelo_pipeline.named_steps['preprocessor'].transform(background)
+background_df = pd.DataFrame(background_num)
+
+import shap
+with st.spinner("Creando explainer y calculando SHAP..."):
+    explainer = shap.KernelExplainer(model_predict, background_df)
+    new_row_num = modelo_pipeline.named_steps['preprocessor'].transform(new_row)
+    shap_values = explainer.shap_values(new_row_num, nsamples=100)
+    base_value = explainer.expected_value
 
 # === Predicción ===
 y_prob = modelo_pipeline.predict_proba(new_row)[0]
