@@ -13,8 +13,8 @@ st.title("What‑if SHAP Explorer — App Streamlit")
 st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinidas en GitHub.")
 
 # CONFIGURA AQUÍ LAS URLS RAW DE GITHUB
-CSV_URL = "https://raw.githubusercontent.com/usuario/repositorio/rama/data/clientes.csv"
-MODEL_URL = "https://raw.githubusercontent.com/usuario/repositorio/rama/modelo/model.pkl"
+CSV_URL = "https://github.com/jmiglesias98/DataScience/blob/main/clientes.csv"
+MODEL_URL = "https://github.com/jmiglesias98/DataScience/blob/main/mejor_modelo_con_umbral_20251015.pkl"
 
 @st.cache_data
 def fetch_url(url):
