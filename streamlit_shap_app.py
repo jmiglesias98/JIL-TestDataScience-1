@@ -99,7 +99,6 @@ st.write(new_row.T)
 st.write("---")
 st.header("Predicción y explicabilidad (SHAP)")
 
-@st.cache_resource
 def make_explainer(model, background_df):
     try:
         expl = shap.Explainer(model, background_df, feature_names=background_df.columns.tolist())
