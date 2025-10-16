@@ -117,13 +117,14 @@ def make_explainer(model, background_df):
         raise RuntimeError(f"No se pudo crear el explainer de SHAP: {e}")
 
 with st.spinner("Creando explainer y calculando SHAP..."):
-    explainer, background_numeric = make_explainer(model, background)
+    explainer, background_sample = make_explainer(model, background)
 
-# Para la fila de entrada
-X_input_numeric = new_row[background_numeric.columns]
-explanation = explainer(X_input_numeric)
-shap_vals = explanation.values[0]
-base_value = explanation.base_values[0]
+# Convertir la fila de entrada a DataFrame compatible
+X_input = new_row[background_sample.columns]
+
+# Calcular valores SHAP (puedes ajustar nsamples para velocidad)
+shap_vals = explainer.shap_values(X_input, nsamples=100)[0]  # si X_input tiene una fila
+base_value = explainer.expected_value
 
 try:
     if hasattr(model, 'predict_proba'):
