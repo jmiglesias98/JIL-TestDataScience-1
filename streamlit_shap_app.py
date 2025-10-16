@@ -85,7 +85,7 @@ st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
 st.title("What-if SHAP Explorer — App Streamlit")
 
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
-MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/mejor_modelo_20251016.joblib"
+MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.joblib"
 
 @st.cache_data
 def fetch_url(url):
