@@ -15,6 +15,15 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 # CONFIGURA AQUÍ LAS URLS RAW DE GITHUB
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
 MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.pkl"
+@st.cache_data
+def fetch_url(url):
+    r = requests.get(url)
+    r.raise_for_status()
+    return r.content
+
+@st.cache_data
+def load_df_from_bytes(bts):
+    return pd.read_csv(BytesIO(bts))
 
 class DataCleaner(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -58,17 +67,7 @@ class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
 
         self.ct.fit(X)
         return self
-
-@st.cache_data
-def fetch_url(url):
-    r = requests.get(url)
-    r.raise_for_status()
-    return r.content
-
-@st.cache_data
-def load_df_from_bytes(bts):
-    return pd.read_csv(BytesIO(bts))
-
+        
 @st.cache_data
 def load_model_from_bytes(bts):
     return pickle.loads(bts)
