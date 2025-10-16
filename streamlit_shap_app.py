@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from io import BytesIO
 import requests
 import streamlit as st
-pip install dill
 import dill
 
 st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
