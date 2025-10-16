@@ -192,16 +192,19 @@ st.write(new_row.T)
 # 🧩 Predicción y SHAP — CORREGIDO FINAL
 # ============================================================
 
-# 1️⃣ Separar el modelo y el preprocesamiento
+# ============================================================
+# 🧩 Predicción y SHAP — VERSIÓN FINAL ROBUSTA
+# ============================================================
+
 try:
     cleaner = modelo_pipeline.named_steps.get('cleaner')
     preprocessor = modelo_pipeline.named_steps.get('preprocessor')
-    model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]  # último step (el clasificador)
+    model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 except Exception:
-    st.error("❌ No se encontraron pasos 'cleaner' o 'preprocessor' en el pipeline. Revisa los nombres.")
+    st.error("❌ No se encontraron pasos 'cleaner' o 'preprocessor' en el pipeline.")
     st.stop()
 
-# 2️⃣ Preparar el background transformado
+# 1️⃣ Background (en el mismo espacio que el modelo espera)
 background_raw = df.sample(min(100, len(df)), random_state=42)
 background_clean = cleaner.transform(background_raw)
 background_preprocessed = preprocessor.transform(background_clean)
@@ -211,15 +214,7 @@ if hasattr(background_preprocessed, "values"):
 else:
     background_array = background_preprocessed
 
-# 3️⃣ Crear función predictora solo con el modelo final
-def model_predict_preprocessed(X_array):
-    return model.predict_proba(X_array)[:, 1]
-
-# 4️⃣ Crear explainer con los datos en el espacio del modelo
-with st.spinner("🧠 Creando explainer y calculando SHAP..."):
-    explainer = shap.KernelExplainer(model_predict_preprocessed, background_array)
-
-# 5️⃣ Preparar la fila modificada (misma transformación que background)
+# 2️⃣ Preparar la fila de entrada del usuario
 X_input = new_row.copy()
 X_input_clean = cleaner.transform(X_input)
 X_input_preprocessed = preprocessor.transform(X_input_clean)
@@ -229,23 +224,23 @@ if hasattr(X_input_preprocessed, "values"):
 else:
     X_input_array = X_input_preprocessed
 
-# 6️⃣ Calcular valores SHAP
-shap_values = explainer.shap_values(X_input_array, nsamples=100)
-base_value = explainer.expected_value
-
-# 7️⃣ Calcular predicción final (probabilidad)
+# 3️⃣ Calcular predicción
 y_pred_proba = model.predict_proba(X_input_array)[0, 1]
 st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
-st.write(f"Base value (modelo): {base_value}")
 
-# 8️⃣ Obtener nombres de features
-try:
-    feat_names = preprocessor.ct.get_feature_names_out().tolist()
-except Exception:
-    feat_names = [f"f{i}" for i in range(X_input_array.shape[1])]
+# 4️⃣ Usar SHAP.Explainer (automático y seguro)
+with st.spinner("🧠 Calculando valores SHAP..."):
+    explainer = shap.Explainer(model, background_array)
+    shap_values = explainer(X_input_array)
 
-# 9️⃣ Mostrar gráfico Waterfall
-vals = shap_values[0].tolist() if isinstance(shap_values, (list, tuple)) else shap_values.tolist()
+# 5️⃣ Mostrar resumen
+base_value = explainer.expected_value
+st.write(f"Base value: {base_value}")
+
+# 6️⃣ Gráfico Waterfall (Plotly)
+vals = shap_values.values[0]
+feat_names = explainer.feature_names if hasattr(explainer, "feature_names") else [f"f{i}" for i in range(len(vals))]
+
 order = np.argsort(np.abs(vals))[::-1]
 top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)",
                           min_value=3, max_value=min(50, len(feat_names)), value=min(10, len(feat_names)))
@@ -254,7 +249,7 @@ ordered_feats = [feat_names[i] for i in order[:top_k]]
 ordered_vals = [vals[i] for i in order[:top_k]]
 
 x = ["Base value"] + ordered_feats + ["Prediction"]
-measures = ["absolute"] + ["relative"]*len(ordered_vals) + ["total"]
+measures = ["absolute"] + ["relative"] * len(ordered_vals) + ["total"]
 y = [base_value] + ordered_vals + [None]
 
 fig = go.Figure(go.Waterfall(
@@ -268,13 +263,3 @@ fig = go.Figure(go.Waterfall(
 ))
 fig.update_layout(title_text=f"Waterfall de contribuciones SHAP (top {top_k})", waterfallgroupgap=0.5)
 st.plotly_chart(fig, use_container_width=True)
-
-# ============================================================
-# 💾 Exportar fila modificada
-# ============================================================
-buf = BytesIO()
-new_row.to_csv(buf, index=False)
-buf.seek(0)
-st.download_button("💾 Descargar fila modificada (CSV)", data=buf, file_name="cliente_modificado.csv", mime="text/csv")
-
-st.info("⚠️ Pickles o joblibs pueden ejecutar código arbitrario. Solo usa modelos de confianza.")
