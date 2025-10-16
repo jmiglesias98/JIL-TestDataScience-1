@@ -14,7 +14,7 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 
 # CONFIGURA AQUÍ LAS URLS RAW DE GITHUB
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
-MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/mejor_modelo_con_umbral_20251015.pkl"
+MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.pkl"
 
 @st.cache_data
 def fetch_url(url):
