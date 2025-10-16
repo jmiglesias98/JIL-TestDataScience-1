@@ -34,14 +34,14 @@ class DataCleaner(BaseEstimator, TransformerMixin):
             "job": ["admin.", "unknown", "unemployed", "management", "housemaid",
                     "entrepreneur", "student", "blue-collar", "self-employed",
                     "retired", "technician", "services"],
-            "marital": ["married","divorced","single"],
-            "education": ["unknown","secondary","primary","tertiary"],
-            "default": ["yes","no"],
-            "housing": ["yes","no"],
-            "loan": ["yes","no"],
-            "contact": ["unknown","telephone","cellular"],
-            "month": ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"],
-            "poutcome": ["unknown","other","failure","success"]
+            "marital": ["married", "divorced", "single"],
+            "education": ["unknown", "secondary", "primary", "tertiary"],
+            "default": ["yes", "no"],
+            "housing": ["yes", "no"],
+            "loan": ["yes", "no"],
+            "contact": ["unknown", "telephone", "cellular"],
+            "month": ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"],
+            "poutcome": ["unknown", "other", "failure", "success"]
         }
 
     def fit(self, X, y=None):
@@ -189,56 +189,62 @@ st.write("### 🧮 Valores modificados")
 st.write(new_row.T)
 
 # ============================================================
-# 🧩 Predicción y SHAP — CORREGIDO
+# 🧩 Predicción y SHAP — CORREGIDO FINAL
 # ============================================================
 
-# --- Función robusta para predicción ---
-def model_predict(X):
-    # SHAP puede pasar arrays; convertirlos a DataFrame con nombres originales
-    if isinstance(X, np.ndarray):
-        try:
-            X = pd.DataFrame(X, columns=features)
-        except Exception:
-            X = pd.DataFrame(X)
-    return modelo_pipeline.predict_proba(X)[:, 1]
+# 1️⃣ Separar el modelo y el preprocesamiento
+try:
+    cleaner = modelo_pipeline.named_steps.get('cleaner')
+    preprocessor = modelo_pipeline.named_steps.get('preprocessor')
+    model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]  # último step (el clasificador)
+except Exception:
+    st.error("❌ No se encontraron pasos 'cleaner' o 'preprocessor' en el pipeline. Revisa los nombres.")
+    st.stop()
 
-# --- Background del explainer (mismo formato que usa model_predict) ---
+# 2️⃣ Preparar el background transformado
 background_raw = df.sample(min(100, len(df)), random_state=42)
-background_for_explainer = background_raw.copy()
+background_clean = cleaner.transform(background_raw)
+background_preprocessed = preprocessor.transform(background_clean)
 
+if hasattr(background_preprocessed, "values"):
+    background_array = background_preprocessed.values
+else:
+    background_array = background_preprocessed
+
+# 3️⃣ Crear función predictora solo con el modelo final
+def model_predict_preprocessed(X_array):
+    return model.predict_proba(X_array)[:, 1]
+
+# 4️⃣ Crear explainer con los datos en el espacio del modelo
 with st.spinner("🧠 Creando explainer y calculando SHAP..."):
-    explainer = shap.KernelExplainer(model_predict, background_for_explainer)
+    explainer = shap.KernelExplainer(model_predict_preprocessed, background_array)
 
-# --- Calcular SHAP para el cliente modificado ---
+# 5️⃣ Preparar la fila modificada (misma transformación que background)
 X_input = new_row.copy()
-if isinstance(X_input, np.ndarray):
-    X_input = pd.DataFrame(X_input, columns=features)
+X_input_clean = cleaner.transform(X_input)
+X_input_preprocessed = preprocessor.transform(X_input_clean)
 
-shap_values = explainer.shap_values(X_input, nsamples=100)
+if hasattr(X_input_preprocessed, "values"):
+    X_input_array = X_input_preprocessed.values
+else:
+    X_input_array = X_input_preprocessed
+
+# 6️⃣ Calcular valores SHAP
+shap_values = explainer.shap_values(X_input_array, nsamples=100)
 base_value = explainer.expected_value
 
-# --- Predicción del modelo ---
-try:
-    y_pred_proba = modelo_pipeline.predict_proba(X_input)[0][1]
-except Exception:
-    y_pred_proba = None
-
-st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4) if y_pred_proba is not None else "Error"))
+# 7️⃣ Calcular predicción final (probabilidad)
+y_pred_proba = model.predict_proba(X_input_array)[0, 1]
+st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
 st.write(f"Base value (modelo): {base_value}")
 
-# --- Obtener nombres de features de forma robusta ---
+# 8️⃣ Obtener nombres de features
 try:
-    feat_names = modelo_pipeline.named_steps['preprocessor'].ct.get_feature_names_out().tolist()
+    feat_names = preprocessor.ct.get_feature_names_out().tolist()
 except Exception:
-    try:
-        processed_example = modelo_pipeline.named_steps['preprocessor'].transform(
-            modelo_pipeline.named_steps['cleaner'].transform(df.head(1))
-        )
-        feat_names = processed_example.columns.tolist() if hasattr(processed_example, "columns") else [f"f{i}" for i in range(processed_example.shape[1])]
-    except Exception:
-        feat_names = features
+    feat_names = [f"f{i}" for i in range(X_input_array.shape[1])]
 
-# --- Crear gráfico tipo Waterfall ---
+# 9️⃣ Mostrar gráfico Waterfall
 vals = shap_values[0].tolist() if isinstance(shap_values, (list, tuple)) else shap_values.tolist()
 order = np.argsort(np.abs(vals))[::-1]
 top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)",
@@ -258,7 +264,7 @@ fig = go.Figure(go.Waterfall(
     x=x,
     y=y,
     textposition="outside",
-    connector={"line":{"color":"rgb(63, 63, 63)"}}
+    connector={"line": {"color": "rgb(63, 63, 63)"}}
 ))
 fig.update_layout(title_text=f"Waterfall de contribuciones SHAP (top {top_k})", waterfallgroupgap=0.5)
 st.plotly_chart(fig, use_container_width=True)
@@ -272,4 +278,3 @@ buf.seek(0)
 st.download_button("💾 Descargar fila modificada (CSV)", data=buf, file_name="cliente_modificado.csv", mime="text/csv")
 
 st.info("⚠️ Pickles o joblibs pueden ejecutar código arbitrario. Solo usa modelos de confianza.")
-
