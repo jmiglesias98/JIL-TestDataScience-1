@@ -193,49 +193,49 @@ st.write(new_row.T)
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-st.header("Predicción y explicabilidad (SHAP)")
+# ============================================================
+# 🔹 Bloque SHAP y predicción
+# ============================================================
+import shap
 
-# Transformar background y fila de entrada usando solo el preprocesador numérico
-preproc = modelo_pipeline.named_steps['preprocessor']
-background_num = preproc.transform(background)
-new_row_num = preproc.transform(new_row)
-
-background_df = pd.DataFrame(background_num)
-
+# Función de predicción usando la pipeline completa
 def model_predict(X):
-    return modelo_pipeline.named_steps['modelo'].predict_proba(X)[:, 1]
+    return modelo_pipeline.predict_proba(X)[:, 1]
 
+# Crear background_df con la pipeline (solo preprocesamiento)
+background_raw = df.sample(min(100, len(df)), random_state=42)
+background_df = modelo_pipeline.named_steps['preprocessor'].transform(
+    modelo_pipeline.named_steps['cleaner'].transform(background_raw)
+)
+
+# Crear explainer
 with st.spinner("Creando explainer y calculando SHAP..."):
     explainer = shap.KernelExplainer(model_predict, background_df)
-    shap_values = explainer.shap_values(new_row_num, nsamples=100)
-    base_value = explainer.expected_value
 
-# ============================================================
-# 🏗️ Mostrar predicción
-# ============================================================
+# Preparar fila modificada para predicción
+X_input = new_row.copy()
+
+# Calcular valores SHAP
+shap_values = explainer.shap_values(X_input, nsamples=100)
+base_value = explainer.expected_value
+
+# Calcular probabilidad de clase 1
 try:
-    y_pred = modelo_pipeline.predict(new_row)[0]
+    y_pred_proba = modelo_pipeline.predict_proba(X_input)[0][1]
 except Exception:
-    y_pred = None
+    y_pred_proba = None
 
-st.metric("Predicción (modelo)", value=str(y_pred))
+st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4) if y_pred_proba is not None else "Error"))
 st.write(f"Base value (modelo): {base_value}")
 
-# ============================================================
-# 📊 Waterfall SHAP
-# ============================================================
-top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)", min_value=3, max_value=min(50, new_row_num.shape[1]), value=min(10, new_row_num.shape[1]))
-
+# Mostrar waterfall de SHAP
+feat_names = modelo_pipeline.named_steps['preprocessor'].ct.get_feature_names_out().tolist()
 vals = shap_values[0].tolist()
 order = np.argsort(np.abs(vals))[::-1]
-order_top = order[:top_k]
-ordered_vals = [vals[i] for i in order_top]
-ordered_feats = [f"Feature {i}" for i in order_top]
+top_k = st.sidebar.slider("Número de features a mostrar (top K por impacto)", min_value=3, max_value=min(50, len(feat_names)), value=min(10, len(feat_names)))
 
-if len(vals) > top_k:
-    other_sum = float(np.sum([vals[i] for i in order[top_k:]]))
-    ordered_feats.append('Otros (resto)')
-    ordered_vals.append(other_sum)
+ordered_feats = [feat_names[i] for i in order[:top_k]]
+ordered_vals = [vals[i] for i in order[:top_k]]
 
 x = ["Base value"] + ordered_feats + ["Prediction"]
 measures = ["absolute"] + ["relative"]*len(ordered_vals) + ["total"]
@@ -252,15 +252,6 @@ fig = go.Figure(go.Waterfall(
 ))
 fig.update_layout(title_text=f"Waterfall de contribuciones SHAP (top {top_k})", waterfallgroupgap=0.5)
 st.plotly_chart(fig, use_container_width=True)
-
-# ============================================================
-# 📋 Tabla de contribuciones
-# ============================================================
-shap_df = pd.DataFrame({"feature": ordered_feats, "shap_value": ordered_vals})
-shap_df["abs_shap"] = shap_df["shap_value"].abs()
-shap_df = shap_df.sort_values("abs_shap", ascending=False)
-st.subheader("Contribuciones (top features)")
-st.dataframe(shap_df.reset_index(drop=True))
 
 # ============================================================
 # 💾 Exportar fila modificada
