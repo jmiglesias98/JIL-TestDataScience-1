@@ -21,6 +21,88 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
 MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/modelo.joblib"
 
+import pandas as pd
+import numpy as np
+import streamlit as st
+import joblib
+import shap
+import plotly.graph_objects as go
+from io import BytesIO
+import requests
+
+# Importar tus clases personalizadas
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+# === DataCleaner y PreprocesadorDinamico ===
+class DataCleaner(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.categorical_cols = {
+            "job": ["admin.", "unknown", "unemployed", "management", "housemaid",
+                    "entrepreneur", "student", "blue-collar", "self-employed",
+                    "retired", "technician", "services"],
+            "marital": ["married","divorced","single"],
+            "education": ["unknown","secondary","primary","tertiary"],
+            "default": ["yes","no"],
+            "housing": ["yes","no"],
+            "loan": ["yes","no"],
+            "contact": ["unknown","telephone","cellular"],
+            "month": ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"],
+            "poutcome": ["unknown","other","failure","success"]
+        }
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        df = X.copy()
+        for col, allowed_values in self.categorical_cols.items():
+            if col in df.columns:
+                mode_value = df[col].mode()[0]
+                df[col] = df[col].apply(
+                    lambda val: mode_value if pd.isna(val)
+                    else ("unknown" if val not in allowed_values and "unknown" in allowed_values
+                          else (mode_value if val not in allowed_values else val))
+                )
+        return df
+
+class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
+    def __init__(self, cols_to_drop_after_ohe=None):
+        self.cols_to_drop_after_ohe = cols_to_drop_after_ohe
+        self.ct = None
+
+    def fit(self, X, y=None):
+        num_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
+        cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
+        num_transformer = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler())
+        ])
+        cat_transformer = Pipeline([
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ohe", OneHotEncoder(drop="first", handle_unknown="ignore", sparse_output=False))
+        ])
+        self.ct = ColumnTransformer([
+            ("num", num_transformer, num_cols),
+            ("cat", cat_transformer, cat_cols)
+        ])
+        self.ct.fit(X)
+        return self
+
+    def transform(self, X):
+        X_t = self.ct.transform(X)
+        num_cols = self.ct.transformers_[0][2]
+        cat_cols = self.ct.transformers_[1][1]["ohe"].get_feature_names_out(self.ct.transformers_[1][2])
+        all_cols = list(num_cols) + list(cat_cols)
+        df = pd.DataFrame(X_t, columns=all_cols, index=X.index)
+        if self.cols_to_drop_after_ohe:
+            cols_existentes = [c for c in self.cols_to_drop_after_ohe if c in df.columns]
+            df = df.drop(columns=cols_existentes, errors="ignore")
+        return df
+
 # ============================================================
 # 📥 Funciones de carga
 # ============================================================
