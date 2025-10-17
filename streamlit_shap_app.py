@@ -133,12 +133,27 @@ class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
         return df.values
 
     def get_feature_names_out(self):
-        if self.feature_names_out_ is None:
+        """
+        Devuelve los nombres de las variables después de la transformación.
+        Si el modelo fue cargado desde un joblib antiguo y no tiene
+        feature_names_out_ definido, los reconstruye desde el ColumnTransformer.
+        """
+        # Si ya está definido, lo usamos
+        if hasattr(self, "feature_names_out_") and self.feature_names_out_ is not None:
+            return self.feature_names_out_
+
+        # Si existe ColumnTransformer, obtenemos directamente los nombres
+        if hasattr(self, "ct") and hasattr(self.ct, "get_feature_names_out"):
             try:
-                self.feature_names_out_ = self.ct.get_feature_names_out()
+                names = self.ct.get_feature_names_out()
+                # Limpiar nombres de prefijos de steps (num__ y cat__)
+                names = [n.replace("num__", "").replace("cat__", "") for n in names]
+                return names
             except Exception:
-                self.feature_names_out_ = []
-        return self.feature_names_out_
+                pass
+
+        # Si no hay nada, devolvemos una lista vacía (evita crash)
+        return []
 
 # ============================================================
 # 📥 Funciones de carga
