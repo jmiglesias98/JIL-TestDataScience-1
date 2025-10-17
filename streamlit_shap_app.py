@@ -335,6 +335,8 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 import io
+from pptx.enum.text import MSO_ANCHOR
+
 
 def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
     prs = Presentation()
@@ -372,7 +374,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         box.fill.fore_color.rgb = bg
         tf = box.text_frame
         tf.text = text
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE  # ✅ valor correcto de enumeración
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
         tf.margin_bottom = tf.margin_top = tf.margin_left = tf.margin_right = 0
         for p in tf.paragraphs:
             p.font.size = Pt(12)
