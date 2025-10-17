@@ -483,6 +483,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     return pptx_stream
 
 file_name = f"simulacion_resultados_cliente_{row_selector}.pptx"
+pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
 
 st.download_button(
     label="📥 Descargar  PPTX",
