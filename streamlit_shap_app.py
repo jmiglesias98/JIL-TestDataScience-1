@@ -347,6 +347,7 @@ with col2:
 # 🖨️ PPTX con gráficas idénticas
 # ============================================================
 def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
+    import io
     prs = Presentation()
 
     # Tamaño de diapositiva
