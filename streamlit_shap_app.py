@@ -442,7 +442,19 @@ def create_pptx_dark_improved(prob_before, prob_after, comparacion_df,
     pptx_io.seek(0)
     return pptx_io
 
-pptx_data = create_pptx_dark_improved()
-st.download_button("⬇️ Descargar PPTX", pptx_data,
-                   file_name="simulacion_deposito.pptx")
+# Suponiendo que ya tienes la función create_pptx_dark_improved
+# y las variables: prob_before, prob_after, comparacion_df, fig_before, fig_after
+
+pptx_data = create_pptx_dark_improved(
+    prob_before, prob_after, comparacion_df,
+    fig_before, fig_after
+)
+
+# Botón para descargar la PPT
+st.download_button(
+    label="📥 Descargar PPT",
+    data=pptx_data,
+    file_name=f"simulacion_cliente_{row_selector}.pptx",
+    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+)
 
