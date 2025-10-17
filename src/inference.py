@@ -1,8 +1,6 @@
-# src/inference.py
 import pandas as pd
-from typing import List
-from .load_model import load_model
 import numpy as np
+from .load_model import load_model
 
 _model = None
 
@@ -12,36 +10,25 @@ def get_model():
         _model = load_model()
     return _model
 
-def predict_from_df(df: pd.DataFrame):
+def predict_from_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Devuelve un DataFrame con las predicciones y probabilidades.
-    Asume que el pipeline acepta un DataFrame (o numpy array con el order de features correcto).
+    Devuelve las columnas originales y añade solo la probabilidad de la clase 1.
     """
     model = get_model()
 
-    # Si el pipeline espera un DataFrame con columnas exactas, intenta adaptarlo:
+    # Intentar predecir directamente con DataFrame
     try:
         probs = model.predict_proba(df)
-        preds = model.predict(df)
     except Exception:
-        # como fallback, intenta pasar los valores (si pipeline fue entrenado con arrays)
         X = df.values
         probs = model.predict_proba(X)
-        preds = model.predict(X)
 
-    # prepara salida
+    # Asegurarse de que probs sea 2D
+    if probs.ndim == 1:
+        probs = np.vstack([1 - probs, probs]).T
+
+    # Crear DataFrame de salida con todas las columnas originales
     out = df.copy().reset_index(drop=True)
-    out["prediction"] = preds
-    # si hay 2 clases, probabilidad de clase positiva en columna 1
-    if probs.shape[1] == 2:
-        out["prob_pos"] = probs[:, 1]
-    else:
-        # si varias clases, añade columnas por clase
-        for i in range(probs.shape[1]):
-            out[f"prob_class_{i}"] = probs[:, i]
+    out["prob_class_1"] = probs[:, 1]
 
     return out
-
-def predict_from_csv(path: str):
-    df = pd.read_csv(path, sep=None, engine='python')  # intenta autodetectar separador
-    return predict_from_df(df)
