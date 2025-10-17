@@ -9,6 +9,8 @@ dill
 scikit-learn==1.6.1
 matplotlib
 presentation
+python-pptx
+
 
 
 
