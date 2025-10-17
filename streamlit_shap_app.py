@@ -22,7 +22,7 @@ st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinida
 # ============================================================
 # 🌐 URLs
 # ============================================================
-CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes.csv"
+CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes_20251016.csv"
 MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/mejor_modelo_20251016.joblib"
 
 # ============================================================
