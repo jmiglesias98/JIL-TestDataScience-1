@@ -20,8 +20,7 @@ from sklearn.pipeline import Pipeline
 # ⚙️ Configuración de la app
 # ============================================================
 st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
-st.title("What-if SHAP Explorer — App Streamlit")
-st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinidas en GitHub.")
+st.title("Simulador de contratación de depósitos en base a la campaña de marketing previa")
 
 # ============================================================
 # 🌐 URLs
@@ -196,14 +195,19 @@ with col2:
         new_row.at[new_row.index[0], c] = new_val
 
 # ============================================================
-# 🧾 Tabla comparativa con resaltado de cambios
+# 🧾 Tabla comparativa con resaltado de cambios (sin 'campaign')
 # ============================================================
+# Crear dataframe comparativo
 comparacion = pd.DataFrame({
     "Variable": base_row.columns,
     "Valor original": base_row.iloc[0].values,
     "Valor modificado": new_row.iloc[0].values
 })
 
+# Excluir la variable 'campaign'
+comparacion = comparacion[comparacion["Variable"] != "campaign"].reset_index(drop=True)
+
+# Función para resaltar cambios
 def highlight_changes(row):
     orig = row["Valor original"]
     mod = row["Valor modificado"]
