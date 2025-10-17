@@ -1,8 +1,14 @@
 # JIL-TestDataScience-1
 
-Este repositorio contiene un proyecto de ciencia de datos enfocado en evaluar la efectividad de una campaña de marketing de un banco portugués. El objetivo principal es analizar cómo las acciones de la campaña influyen en la decisión de los clientes contactados para contratar un depósito, y proporcionar herramientas predictivas y analíticas que puedan ser utilizadas para mejorar futuras campañas.
+Este repositorio contiene un proyecto de ciencia de datos centrado en evaluar la efectividad de una campaña de marketing de un banco portugués. El objetivo principal es analizar cómo las acciones de la campaña afectan la decisión de los clientes contactados para contratar un depósito, y proporcionar herramientas predictivas y analíticas que puedan apoyar la planificación de futuras campañas.
 
-El proyecto combina análisis exploratorio de datos, construcción y evaluación de modelos predictivos, y prácticas de DevOps para el despliegue del modelo mediante contenedores Docker.
+Entre las herramientas desarrolladas se incluyen:
+
+- **Modelo de propensión a la contratación de depósitos**: permite predecir la probabilidad de que un cliente contrate un depósito, y puede ejecutarse de manera periódica, tanto en modo batch como online, asegurando un uso eficiente y escalable en entornos de producción.
+
+- **Simulador “What-If**: proporciona al equipo de marketing la posibilidad de realizar análisis de escenarios basados en los resultados históricos y las predicciones del modelo.
+
+El proyecto combina análisis exploratorio de datos, construcción y evaluación de modelos predictivos, y está preparado para un despliegue reproducible mediante contenedores Docker, lo que facilita su integración en entornos productivos y el uso colaborativo.
 
 ## Estructura del Proyecto
 
