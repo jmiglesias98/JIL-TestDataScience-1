@@ -19,8 +19,8 @@ from sklearn.pipeline import Pipeline
 # ============================================================
 # ⚙️ Configuración de la app
 # ============================================================
-st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
-st.title("Simulador de contratación de depósitos en base a la campaña de marketing previa")
+st.set_page_config(layout="wide", page_title="Simulador de contratación de depósitos")
+st.title("Simulador de contratación de depósitos")
 
 # ============================================================
 # 🌐 URLs
