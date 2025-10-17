@@ -7,4 +7,6 @@ xgboost
 plotly
 dill
 scikit-learn==1.6.1
+matplotlib
+
 
