@@ -334,38 +334,43 @@ st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las m�
 # ============================================================
 # 🖨️ Descargar PPTX con resultados mejorado
 # ============================================================
-from pptx.dml.color import RGBColor
-from pptx.util import Pt
-
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from io import BytesIO
 
-def create_pptx_with_shap():
+def create_pptx_dark():
     prs = Presentation()
-    slide_layout = prs.slide_layouts[5]  # Blanco
-    
-    # --- Slide 1: Probabilidades y tabla comparativa ---
+    slide_layout = prs.slide_layouts[5]  # Blanco (se sobreescribe fondo)
+
+    dark_bg = RGBColor(34, 34, 34)  # fondo oscuro
+    title_color = RGBColor(255, 255, 255)  # títulos en blanco
+    prob_text_color = RGBColor(255, 255, 255)  # texto probabilidades
+    table_header_color = RGBColor(0, 102, 204)  # azul oscuro para headers
+    table_text_color = RGBColor(255, 255, 255)  # texto tabla en blanco
+    table_highlight_color = RGBColor(0, 153, 76)  # verde oscuro para cambios
+
+    # --- Slide 1: Resumen ---
     slide1 = prs.slides.add_slide(slide_layout)
     slide1.background.fill.solid()
-    slide1.background.fill.fore_color.rgb = RGBColor(245, 245, 245)  # gris claro
+    slide1.background.fill.fore_color.rgb = dark_bg
 
     # Título
     title1 = slide1.shapes.title
     title1.text = f"Cliente índice {row_selector} - Resumen"
-    title1.text_frame.paragraphs[0].font.size = Pt(24)
-    title1.text_frame.paragraphs[0].font.bold = True
-    title1.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 51, 102)
+    p = title1.text_frame.paragraphs[0]
+    p.font.size = Pt(12)
+    p.font.bold = True
+    p.font.color.rgb = title_color
 
     # Cuadros de probabilidades
     txBox_before = slide1.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(4), Inches(0.8))
     tfb = txBox_before.text_frame
     p = tfb.paragraphs[0]
     p.text = f"Probabilidad original: {prob_before:.4f}"
-    p.font.size = Pt(18)
+    p.font.size = Pt(12)
     p.font.bold = True
-    p.font.color.rgb = RGBColor(255,255,255)
+    p.font.color.rgb = prob_text_color
     txBox_before.fill.solid()
     txBox_before.fill.fore_color.rgb = RGBColor(0, 102, 204)  # azul
 
@@ -373,9 +378,9 @@ def create_pptx_with_shap():
     tfa = txBox_after.text_frame
     p = tfa.paragraphs[0]
     p.text = f"Probabilidad modificada: {prob_after:.4f}"
-    p.font.size = Pt(18)
+    p.font.size = Pt(12)
     p.font.bold = True
-    p.font.color.rgb = RGBColor(255,255,255)
+    p.font.color.rgb = prob_text_color
     txBox_after.fill.solid()
     txBox_after.fill.fore_color.rgb = RGBColor(0, 153, 76)  # verde
 
@@ -388,41 +393,49 @@ def create_pptx_with_shap():
     height = Inches(0.8 + 0.25*rows)
 
     table = slide1.shapes.add_table(rows, cols, left, top, width, height).table
+
     # Encabezados
     for j, col_name in enumerate(comparacion.columns):
-        table.cell(0,j).text = col_name
-        table.cell(0,j).fill.solid()
-        table.cell(0,j).fill.fore_color.rgb = RGBColor(0, 51, 102)
-        table.cell(0,j).text_frame.paragraphs[0].font.color.rgb = RGBColor(255,255,255)
-        table.cell(0,j).text_frame.paragraphs[0].font.size = Pt(12)
-        table.cell(0,j).text_frame.paragraphs[0].font.bold = True
+        cell = table.cell(0,j)
+        cell.text = col_name
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = table_header_color
+        para = cell.text_frame.paragraphs[0]
+        para.font.size = Pt(12)
+        para.font.bold = True
+        para.font.color.rgb = table_text_color
 
     # Datos
     for i in range(1, rows):
         for j in range(cols):
             val = comparacion.iloc[i-1,j]
-            table.cell(i,j).text = str(val)
-            table.cell(i,j).text_frame.paragraphs[0].font.size = Pt(11)
+            cell = table.cell(i,j)
+            cell.text = str(val)
+            cell.text_frame.paragraphs[0].font.size = Pt(12)
+            cell.text_frame.paragraphs[0].font.color.rgb = table_text_color
             # Resaltar cambios en columna "Valor modificado"
             if j==2 and comparacion.iloc[i-1,1] != comparacion.iloc[i-1,2]:
-                table.cell(i,j).fill.solid()
-                table.cell(i,j).fill.fore_color.rgb = RGBColor(198,239,206)  # verde claro
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = table_highlight_color
 
     # --- Slide 2: SHAP original ---
     slide2 = prs.slides.add_slide(slide_layout)
     slide2.background.fill.solid()
-    slide2.background.fill.fore_color.rgb = RGBColor(255,255,255)
+    slide2.background.fill.fore_color.rgb = dark_bg
     slide2.shapes.title.text = "SHAP valores originales"
+    slide2.shapes.title.text_frame.paragraphs[0].font.size = Pt(12)
+    slide2.shapes.title.text_frame.paragraphs[0].font.color.rgb = title_color
 
-    # Guardar figura SHAP original y añadir
     fig1.savefig("/tmp/shap_before.png", bbox_inches='tight')
     slide2.shapes.add_picture("/tmp/shap_before.png", Inches(1), Inches(1.5), width=Inches(8))
 
     # --- Slide 3: SHAP modificado ---
     slide3 = prs.slides.add_slide(slide_layout)
     slide3.background.fill.solid()
-    slide3.background.fill.fore_color.rgb = RGBColor(255,255,255)
+    slide3.background.fill.fore_color.rgb = dark_bg
     slide3.shapes.title.text = "SHAP valores modificados"
+    slide3.shapes.title.text_frame.paragraphs[0].font.size = Pt(12)
+    slide3.shapes.title.text_frame.paragraphs[0].font.color.rgb = title_color
 
     fig2.savefig("/tmp/shap_after.png", bbox_inches='tight')
     slide3.shapes.add_picture("/tmp/shap_after.png", Inches(1), Inches(1.5), width=Inches(8))
@@ -433,5 +446,6 @@ def create_pptx_with_shap():
     pptx_bytes.seek(0)
     return pptx_bytes
 
-pptx_data = create_pptx_with_shap()
-st.download_button("⬇️ Descargar PPTX completo", pptx_data, file_name="simulacion_deposito_completa.pptx")
+pptx_data = create_pptx_dark()
+st.download_button("⬇️ Descargar PPTX", pptx_data, file_name="simulacion_deposito.pptx")
+
