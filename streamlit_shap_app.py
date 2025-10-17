@@ -367,18 +367,18 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         return box
 
     def add_prob_box(slide, left, top, width, height, text, bg):
-        box = slide.shapes.add_textbox(left, top, width, height)
-        box.fill.solid()
-        box.fill.fore_color.rgb = bg
-        tf = box.text_frame
-        tf.text = text
-        tf.vertical_anchor = "middle"
-        tf.margin_bottom = tf.margin_top = tf.margin_left = tf.margin_right = 0
-        for p in tf.paragraphs:
-            p.font.size = Pt(12)
-            p.font.color.rgb = text_color
-            p.alignment = 1  # centrado
-        return box
+    box = slide.shapes.add_textbox(left, top, width, height)
+    box.fill.solid()
+    box.fill.fore_color.rgb = bg
+    tf = box.text_frame
+    tf.text = text
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE  # ✅ valor correcto de enumeración
+    tf.margin_bottom = tf.margin_top = tf.margin_left = tf.margin_right = 0
+    for p in tf.paragraphs:
+        p.font.size = Pt(12)
+        p.font.color.rgb = RGBColor(255, 255, 255)
+        p.alignment = 1  # centrado horizontal
+    return box
 
     def add_table_from_df(slide, df, top, total_width, left_margin_ratio=0.05, height=Inches(4.5)):
         n_rows, n_cols = df.shape
