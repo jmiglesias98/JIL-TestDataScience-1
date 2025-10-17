@@ -109,7 +109,6 @@ class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
     def get_feature_names_out(self):
         return self.feature_names_out_
 
-
 # ============================================================
 # 📥 Funciones de carga
 # ============================================================
@@ -128,12 +127,11 @@ def load_model_from_bytes(bts):
     return joblib.load(BytesIO(bts))
 
 # ============================================================
-# ⚙️ Cargar datos y modelo
+# ⚙️ Cargar datos y modelo (sin mensajes de éxito)
 # ============================================================
 try:
     csv_bytes = fetch_url(CSV_URL)
     df = load_df_from_bytes(csv_bytes)
-    st.success(f"✅ CSV cargado correctamente desde GitHub: {CSV_URL}")
 except Exception as e:
     st.error(f"❌ Error cargando CSV: {e}")
     st.stop()
@@ -141,7 +139,6 @@ except Exception as e:
 try:
     model_bytes = fetch_url(MODEL_URL)
     modelo_pipeline = load_model_from_bytes(model_bytes)
-    st.success(f"✅ Modelo cargado correctamente desde GitHub: {MODEL_URL}")
 except Exception as e:
     st.error(f"❌ Error cargando modelo: {e}")
     st.stop()
@@ -165,9 +162,6 @@ row_selector = st.sidebar.selectbox(
     options=list(range(len(df)))
 )
 base_row = df.iloc[row_selector:row_selector+1].copy()
-
-st.write("### Cliente actual (valores)")
-st.write(base_row.T)
 
 # ============================================================
 # ✏️ Controles What-If
@@ -201,8 +195,32 @@ with col2:
             new_val = st.text_input(f"{c} (valor)", value=str(default))
         new_row.at[new_row.index[0], c] = new_val
 
-st.write("### 🧮 Valores modificados")
-st.write(new_row.T)
+# ============================================================
+# 🧾 Tabla comparativa con resaltado de cambios
+# ============================================================
+comparacion = pd.DataFrame({
+    "Variable": base_row.columns,
+    "Valor original": base_row.iloc[0].values,
+    "Valor modificado": new_row.iloc[0].values
+})
+
+def highlight_changes(row):
+    orig = row["Valor original"]
+    mod = row["Valor modificado"]
+    if pd.isna(orig) or pd.isna(mod):
+        return [""] * 3
+    if isinstance(orig, (int, float)) and isinstance(mod, (int, float)):
+        if mod > orig:
+            return ["", "background-color: #f0f0f0", "background-color: #d0f0c0"]  # verde suave
+        elif mod < orig:
+            return ["", "background-color: #f0f0f0", "background-color: #f5b7b1"]  # rojo suave
+    else:
+        if orig != mod:
+            return ["", "background-color: #f0f0f0", "background-color: #f9e79f"]  # amarillo
+    return [""] * 3
+
+st.write("### 🧾 Comparativa de valores del cliente")
+st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_width=True)
 
 # ============================================================
 # 🧩 Predicción y SHAP — versión nativa con comparación Before/After
@@ -250,7 +268,6 @@ except Exception:
     except Exception:
         feat_names = [f"f{i}" for i in range(X_before.shape[1])]
 
-# --- Crear explicaciones individuales ---
 exp_before = shap.Explanation(
     values=shap_values_before.values[0],
     base_values=explainer.expected_value,
@@ -265,18 +282,15 @@ exp_after = shap.Explanation(
     feature_names=feat_names
 )
 
-# --- Calcular probabilidades (logit → sigmoide) ---
 prob_before = expit(exp_before.base_values + exp_before.values.sum())
 prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
-# --- Mostrar métricas comparativas ---
 st.markdown("### 📊 Comparativa de Probabilidades")
 colA, colB = st.columns(2)
 colA.metric("Probabilidad original", f"{prob_before:.4f}")
-colB.metric("Probabilidad modificada", f"{prob_after:.4f}", 
+colB.metric("Probabilidad modificada", f"{prob_after:.4f}",
              delta=f"{(prob_after - prob_before)*100:+.2f} pp")
 
-# --- Mostrar dos gráficos de waterfall lado a lado ---
 col1, col2 = st.columns(2)
 
 with col1:
