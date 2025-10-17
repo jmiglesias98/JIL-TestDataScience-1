@@ -1,3 +1,7 @@
+from sklearn.base import BaseEstimator, TransformerMixin
+import pandas as pd
+import numpy as np
+
 # ============================================================
 # 🧹 DataCleaner
 # ============================================================
@@ -58,5 +62,6 @@ class DataCleaner(BaseEstimator, TransformerMixin):
 
         if "campaign" in df.columns:
             df = df.drop(columns="campaign")
+
 
         return df
