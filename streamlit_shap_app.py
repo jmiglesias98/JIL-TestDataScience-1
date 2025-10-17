@@ -205,7 +205,7 @@ st.write("### 🧮 Valores modificados")
 st.write(new_row.T)
 
 # ============================================================
-# 🧩 Predicción y SHAP — versión nativa con waterfall
+# 🧩 Predicción y SHAP — versión nativa con comparación Before/After
 # ============================================================
 try:
     cleaner = modelo_pipeline.named_steps["cleaner"]
@@ -215,55 +215,80 @@ except KeyError:
     st.error("❌ El pipeline no contiene 'cleaner' o 'preprocessor'. Revisa los nombres de pasos.")
     st.stop()
 
-# Aplicar pasos de preprocesamiento
+# --- Preparar datos "antes" y "después" ---
+base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
+
+base_row_preprocessed = preprocessor.transform(base_row_clean)
 new_row_preprocessed = preprocessor.transform(new_row_clean)
-X_input_array = new_row_preprocessed.values if hasattr(new_row_preprocessed, "values") else new_row_preprocessed
 
-# Predicción
-y_pred_proba = model.predict_proba(X_input_array)[0, 1]
-st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
+X_before = base_row_preprocessed.values if hasattr(base_row_preprocessed, "values") else base_row_preprocessed
+X_after = new_row_preprocessed.values if hasattr(new_row_preprocessed, "values") else new_row_preprocessed
 
-# Crear background para SHAP
+# --- Crear background ---
 background_raw = df.sample(min(bg_size, len(df)), random_state=42)
 background_clean = cleaner.transform(background_raw)
 background_preprocessed = preprocessor.transform(background_clean)
 background_array = background_preprocessed.values if hasattr(background_preprocessed, "values") else background_preprocessed
 
-# Explicación SHAP individual
+# --- Crear explainer ---
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
-    shap_values = explainer(X_input_array)
+    shap_values_before = explainer(X_before)
+    shap_values_after = explainer(X_after)
 
 # ============================================================
-# 💧 Waterfall SHAP (versión nativa)
+# 💧 Comparación de Waterfalls
 # ============================================================
-st.write(f"💧 Mostrando explicabilidad individual para cliente índice **{row_selector}**")
+st.write(f"💧 Mostrando comparativa SHAP para cliente índice **{row_selector}**")
 
-# Intentamos recuperar nombres de features de forma segura
 try:
     feat_names = preprocessor.get_feature_names_out()
 except Exception:
     try:
         feat_names = preprocessor.ct.get_feature_names_out()
     except Exception:
-        feat_names = [f"f{i}" for i in range(X_input_array.shape[1])]
+        feat_names = [f"f{i}" for i in range(X_before.shape[1])]
 
-# Crear explicación SHAP
-exp = shap.Explanation(
-    values=shap_values.values[0],
+# --- Crear explicaciones individuales ---
+exp_before = shap.Explanation(
+    values=shap_values_before.values[0],
     base_values=explainer.expected_value,
-    data=X_input_array[0],
+    data=X_before[0],
     feature_names=feat_names
 )
 
-# Mostrar gráfico Waterfall
-fig, ax = plt.subplots(figsize=(10, 6))
-shap.plots.waterfall(exp, max_display=10, show=False)
-st.pyplot(fig)
+exp_after = shap.Explanation(
+    values=shap_values_after.values[0],
+    base_values=explainer.expected_value,
+    data=X_after[0],
+    feature_names=feat_names
+)
 
-# Mostrar probabilidad final (logit → sigmoide)
-logit_total = exp.base_values + exp.values.sum()
-prob_pred = expit(logit_total)
-st.metric("Probabilidad predicha (sigmoide)", f"{prob_pred:.4f}")
-st.caption("El gráfico SHAP está en el espacio log-odds (logit), pero arriba se muestra la probabilidad final equivalente.")
+# --- Calcular probabilidades (logit → sigmoide) ---
+prob_before = expit(exp_before.base_values + exp_before.values.sum())
+prob_after = expit(exp_after.base_values + exp_after.values.sum())
+
+# --- Mostrar métricas comparativas ---
+st.markdown("### 📊 Comparativa de Probabilidades")
+colA, colB = st.columns(2)
+colA.metric("Probabilidad original", f"{prob_before:.4f}")
+colB.metric("Probabilidad modificada", f"{prob_after:.4f}", 
+             delta=f"{(prob_after - prob_before)*100:+.2f} pp")
+
+# --- Mostrar dos gráficos de waterfall lado a lado ---
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Antes de modificaciones")
+    fig1, ax1 = plt.subplots(figsize=(8, 6))
+    shap.plots.waterfall(exp_before, max_display=10, show=False)
+    st.pyplot(fig1)
+
+with col2:
+    st.subheader("Después de modificaciones")
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
+    shap.plots.waterfall(exp_after, max_display=10, show=False)
+    st.pyplot(fig2)
+
+st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las métricas superiores muestran las probabilidades transformadas con sigmoide.")
