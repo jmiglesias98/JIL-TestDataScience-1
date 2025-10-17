@@ -332,7 +332,7 @@ st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las m�
 # 🖨️ Descargar PPTX con resultados
 # ============================================================
 # ============================================================
-# 📤 Generación y descarga de PPT
+# 📤 Generación y descarga de PPT alineada y centrada
 # ============================================================
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -341,11 +341,12 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
 from io import BytesIO
 
-def create_pptx_dark(prob_before, prob_after, comparacion_df, fig_before, fig_after):
+def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
     prs = Presentation()
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
     
+    SLIDE_WIDTH = prs.slide_width
     DARK_BG = RGBColor(30, 30, 30)
     LIGHT_TITLE = RGBColor(220, 220, 220)
     PROB_ORIG_COLOR = RGBColor(70,130,180)
@@ -369,42 +370,55 @@ def create_pptx_dark(prob_before, prob_after, comparacion_df, fig_before, fig_af
     def add_image(slide, img_buf, left, top, width, height):
         slide.shapes.add_picture(img_buf, left, top, width=width, height=height)
     
-    def add_table_from_df(slide, df, left, top, width, height):
-        rows, cols = df.shape
-        table = slide.shapes.add_table(rows+1, cols, left, top, width, height).table
-        table.columns[0].width = Inches(2)
-        for i, col_name in enumerate(df.columns):
-            table.cell(0, i).text = col_name
-            table.cell(0, i).text_frame.paragraphs[0].font.size = Pt(12)
-            table.cell(0, i).text_frame.paragraphs[0].font.color.rgb = RGBColor(255,255,255)
+    def add_table_from_df(slide, df, top, total_width, left_margin_ratio=0.05, height=Inches(4.5)):
+        cols = df.shape[1]
+        left = SLIDE_WIDTH * left_margin_ratio
+        width = SLIDE_WIDTH * (1 - 2*left_margin_ratio)
+        table = slide.shapes.add_table(df.shape[0]+1, cols, left, top, width, height).table
+        
+        # Ancho proporcional para cada columna
+        col_width = width / cols
+        for i in range(cols):
+            table.columns[i].width = col_width
             table.cell(0, i).fill.solid()
             table.cell(0, i).fill.fore_color.rgb = RGBColor(50,50,50)
-        for r in range(rows):
+            table.cell(0, i).text_frame.paragraphs[0].font.size = Pt(12)
+            table.cell(0, i).text_frame.paragraphs[0].font.color.rgb = RGBColor(255,255,255)
+            table.cell(0, i).text = df.columns[i]
+        
+        # Rellenar datos
+        for r in range(df.shape[0]):
             for c in range(cols):
-                table.cell(r+1, c).text = str(df.iloc[r, c])
-                table.cell(r+1, c).text_frame.paragraphs[0].font.size = Pt(12)
-                table.cell(r+1, c).text_frame.paragraphs[0].font.color.rgb = RGBColor(220,220,220)
+                table.cell(r+1, c).text = str(df.iloc[r,c])
                 table.cell(r+1, c).fill.solid()
                 table.cell(r+1, c).fill.fore_color.rgb = RGBColor(60,60,60)
+                table.cell(r+1, c).text_frame.paragraphs[0].font.size = Pt(12)
+                table.cell(r+1, c).text_frame.paragraphs[0].font.color.rgb = RGBColor(220,220,220)
         return table
-    
-    # ---------- Slide 1: probabilidades + valores ----------
+
+    # ---------- Slide 1: probabilidades + tabla ----------
     slide1 = prs.slides.add_slide(prs.slide_layouts[6])
     slide1.background.fill.solid()
     slide1.background.fill.fore_color.rgb = DARK_BG
-    add_text_box(slide1, Inches(0.5), Inches(0.1), Inches(12), Inches(0.5), "Simulación del Cliente", LIGHT_TITLE, RGBColor(80,80,80))
-    add_text_box(slide1, Inches(0.5), Inches(0.7), Inches(6), Inches(0.8),
-                 f"Probabilidad original: {prob_before:.4f}", RGBColor(255,255,255), PROB_ORIG_COLOR)
-    add_text_box(slide1, Inches(7), Inches(0.7), Inches(6), Inches(0.8),
-                 f"Probabilidad modificada: {prob_after:.4f}", RGBColor(255,255,255), PROB_MOD_COLOR)
+    add_text_box(slide1, Inches(0.5), Inches(0.1), Inches(12.3), Inches(0.5), "Simulación del Cliente", LIGHT_TITLE, RGBColor(80,80,80))
     
-    add_table_from_df(slide1, comparacion_df, Inches(0.5), Inches(2), Inches(12), Inches(4.5))
+    # Cajas de probabilidades centradas
+    box_width = Inches(6)
+    gap = Inches(0.3)
+    left1 = (SLIDE_WIDTH - 2*box_width - gap) / 2
+    left2 = left1 + box_width + gap
+    top_prob = Inches(0.7)
+    add_text_box(slide1, left1, top_prob, box_width, Inches(0.8), f"Probabilidad original: {prob_before:.4f}", RGBColor(255,255,255), PROB_ORIG_COLOR)
+    add_text_box(slide1, left2, top_prob, box_width, Inches(0.8), f"Probabilidad modificada: {prob_after:.4f}", RGBColor(255,255,255), PROB_MOD_COLOR)
+    
+    # Tabla centrada horizontalmente
+    add_table_from_df(slide1, comparacion_df, top=Inches(2), total_width=SLIDE_WIDTH, left_margin_ratio=0.05, height=Inches(4.5))
     
     # ---------- Slide 2: SHAP antes ----------
     slide2 = prs.slides.add_slide(prs.slide_layouts[6])
     slide2.background.fill.solid()
     slide2.background.fill.fore_color.rgb = DARK_BG
-    add_text_box(slide2, Inches(0.5), Inches(0.1), Inches(12), Inches(0.5), "SHAP Values Antes", LIGHT_TITLE, RGBColor(80,80,80))
+    add_text_box(slide2, Inches(0.5), Inches(0.1), Inches(12.3), Inches(0.5), "SHAP Values Antes", LIGHT_TITLE, RGBColor(80,80,80))
     
     buf_before = BytesIO()
     fig_before.savefig(buf_before, format="png", bbox_inches='tight', facecolor='#1E1E1E')
@@ -415,7 +429,7 @@ def create_pptx_dark(prob_before, prob_after, comparacion_df, fig_before, fig_af
     slide3 = prs.slides.add_slide(prs.slide_layouts[6])
     slide3.background.fill.solid()
     slide3.background.fill.fore_color.rgb = DARK_BG
-    add_text_box(slide3, Inches(0.5), Inches(0.1), Inches(12), Inches(0.5), "SHAP Values Después", LIGHT_TITLE, RGBColor(80,80,80))
+    add_text_box(slide3, Inches(0.5), Inches(0.1), Inches(12.3), Inches(0.5), "SHAP Values Después", LIGHT_TITLE, RGBColor(80,80,80))
     
     buf_after = BytesIO()
     fig_after.savefig(buf_after, format="png", bbox_inches='tight', facecolor='#1E1E1E')
@@ -428,7 +442,7 @@ def create_pptx_dark(prob_before, prob_after, comparacion_df, fig_before, fig_af
     return pptx_io
 
 # ---------- Botón de descarga ----------
-pptx_data = create_pptx_dark(prob_before, prob_after, comparacion, fig1, fig2)
+pptx_data = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
 st.download_button(
     label="📥 Descargar resultados en PPTX",
     data=pptx_data,
