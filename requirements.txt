@@ -9,13 +9,12 @@ dill
 scikit-learn==1.6.1
 matplotlib
 python-pptx
-
 fastapi
 uvicorn[standard]
 joblib
 python-multipart  # para subir CSV por HTTP
 pytest
-
+dill
 
 
 
