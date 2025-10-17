@@ -6,7 +6,7 @@ Entre las herramientas desarrolladas se incluyen:
 
 - **Modelo de propensión a la contratación de depósitos**: permite predecir la probabilidad de que un cliente contrate un depósito, y puede ejecutarse de manera periódica, tanto en modo batch como online, asegurando un uso eficiente y escalable en entornos de producción.
 
-- **Simulador “What-If**: proporciona al equipo de marketing la posibilidad de realizar análisis de escenarios basados en los resultados históricos y las predicciones del modelo.
+- **Simulador “What-If**: proporciona al equipo de marketing la posibilidad de realizar análisis de escenarios basados en los resultados históricos y las predicciones del modelo (https://jil-testdatascience-1-app.streamlit.app/).
 
 El proyecto combina análisis exploratorio de datos, construcción y evaluación de modelos predictivos, y está preparado para un despliegue reproducible mediante contenedores Docker, lo que facilita su integración en entornos productivos y el uso colaborativo.
 
