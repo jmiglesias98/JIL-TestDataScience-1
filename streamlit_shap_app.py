@@ -348,6 +348,11 @@ with col2:
 # ============================================================
 def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
     import io
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import MSO_ANCHOR
+
     prs = Presentation()
 
     # Tamaño de diapositiva
@@ -355,18 +360,17 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     SLIDE_HEIGHT = prs.slide_height
 
     # 🎨 Colores
-    bg_color = RGBColor(240, 240, 240)  # gris claro
-    title_bg = RGBColor(0, 102, 102)    # verde cian oscuro
-    prob_bg_before = RGBColor(0, 102, 102)
-    prob_bg_after = RGBColor(0, 102, 102)
+    bg_color = RGBColor(240, 240, 240)   # gris claro
+    title_bg = RGBColor(0, 102, 102)     # verde cian oscuro
+    prob_bg_before = RGBColor(31, 119, 180)  # azul
+    prob_bg_after = RGBColor(255, 127, 14)   # naranja
     text_color = RGBColor(255, 255, 255)
     table_fill = RGBColor(230, 230, 230)
     table_text = RGBColor(0, 0, 0)
 
-    # Aplicar fondo a todas las diapositivas
+    # Aplicar fondo gris a todas las diapositivas
     def apply_slide_bg(slide):
-        background = slide.background
-        fill = background.fill
+        fill = slide.background.fill
         fill.solid()
         fill.fore_color.rgb = bg_color
 
@@ -382,7 +386,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         tf.paragraphs[0].font.size = Pt(16)
         tf.paragraphs[0].font.bold = True
         tf.paragraphs[0].font.color.rgb = text_color
-        tf.paragraphs[0].alignment = 1  # centrado
+        tf.paragraphs[0].alignment = 1
         return box
 
     def add_prob_box(slide, left, top, width, height, text, bg):
@@ -403,18 +407,19 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         left = int(SLIDE_WIDTH * left_margin_ratio)
         width = int(SLIDE_WIDTH * (1 - 2 * left_margin_ratio))
 
-        # Altura dinámica según número de filas
-        base_height = Inches(5)
-        height = base_height if n_rows < 12 else Inches(5.5)
-        if n_rows > 18:
-            height = Inches(6)
+        # 🧮 Calcular altura dinámica según número de filas (máx: hasta borde inferior)
+        available_height = SLIDE_HEIGHT - top - Inches(1)
+        base_height = Inches(4.5)
+        height = min(base_height + (n_rows - 10) * 0.2 * Inches(0.2), available_height) if n_rows > 10 else base_height
+        height = max(Inches(2.5), height)  # nunca menor a 2.5"
+
         table = slide.shapes.add_table(
             rows=n_rows + 1, cols=n_cols,
             left=left, top=int(top.emu),
             width=width, height=int(height.emu)
         ).table
 
-        # Ajuste de tamaño de fuente dinámico
+        # Ajustar tamaño de fuente según número de filas
         font_size = 12
         if n_rows > 12:
             font_size = 10
@@ -432,7 +437,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
             cell.text_frame.paragraphs[0].font.color.rgb = text_color
             cell.text_frame.paragraphs[0].alignment = 1
 
-        # Datos
+        # Celdas de datos
         for i in range(n_rows):
             for j in range(n_cols):
                 cell = table.cell(i + 1, j)
@@ -443,6 +448,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
                 cell.text_frame.paragraphs[0].font.color.rgb = table_text
                 cell.text_frame.paragraphs[0].alignment = 1
 
+        # Ajustar ancho de columnas proporcionalmente
         col_width = int(width / n_cols)
         for j in range(n_cols):
             table.columns[j].width = col_width
@@ -478,10 +484,12 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     add_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
     add_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
 
+    # Exportar
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     pptx_stream.seek(0)
     return pptx_stream
+
 
 file_name = f"simulacion_resultados_cliente_{row_selector}.pptx"
 pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
