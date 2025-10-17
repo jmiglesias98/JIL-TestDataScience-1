@@ -22,6 +22,25 @@ from sklearn.pipeline import Pipeline
 st.set_page_config(layout="wide", page_title="Simulador de contratación de depósitos")
 st.title("Simulador de contratación de depósitos")
 
+# 🌙 Forzar modo oscuro
+st.markdown(
+    """
+    <style>
+    body, .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    .stDataFrame {
+        background-color: #0e1117 !important;
+    }
+    .stSlider label, .stSelectbox label, .stTextInput label, .stMarkdown {
+        color: #fafafa !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # ============================================================
 # 🌐 URLs
 # ============================================================
@@ -126,7 +145,7 @@ def load_model_from_bytes(bts):
     return joblib.load(BytesIO(bts))
 
 # ============================================================
-# ⚙️ Cargar datos y modelo (sin mensajes de éxito)
+# ⚙️ Cargar datos y modelo
 # ============================================================
 try:
     csv_bytes = fetch_url(CSV_URL)
@@ -165,6 +184,10 @@ base_row = df.iloc[row_selector:row_selector+1].copy()
 # ============================================================
 # ✏️ Controles What-If
 # ============================================================
+if "selected_row" not in st.session_state or st.session_state["selected_row"] != row_selector:
+    st.session_state["selected_row"] = row_selector
+    st.session_state["mod_values"] = {}
+
 col1, col2 = st.columns(2)
 new_row = base_row.copy()
 numeric_cols = new_row.select_dtypes(include=[np.number]).columns.tolist()
@@ -180,8 +203,11 @@ with col1:
         v_min = min(col_min, col_val - delta)
         v_max = max(col_max, col_val + delta)
         step = (v_max-v_min)/100 if v_max>v_min else 1.0
-        new_val = st.slider(c, min_value=v_min, max_value=v_max, value=col_val, step=step)
+
+        default_val = st.session_state["mod_values"].get(c, col_val)
+        new_val = st.slider(c, min_value=v_min, max_value=v_max, value=default_val, step=step)
         new_row.at[new_row.index[0], c] = new_val
+        st.session_state["mod_values"][c] = new_val
 
 with col2:
     st.subheader("🏷️ Categóricas / Otros")
@@ -189,25 +215,26 @@ with col2:
         uniques = df[c].dropna().unique().tolist()
         default = base_row.iloc[0][c] if c in base_row.columns else (uniques[0] if uniques else "")
         if len(uniques) <= 20 and len(uniques) > 0:
-            new_val = st.selectbox(c, options=uniques, index=uniques.index(default) if default in uniques else 0)
+            default_val = st.session_state["mod_values"].get(c, default)
+            new_val = st.selectbox(c, options=uniques, index=uniques.index(default_val) if default_val in uniques else 0)
         else:
-            new_val = st.text_input(f"{c} (valor)", value=str(default))
+            default_val = st.session_state["mod_values"].get(c, str(default))
+            new_val = st.text_input(f"{c} (valor)", value=default_val)
+
         new_row.at[new_row.index[0], c] = new_val
+        st.session_state["mod_values"][c] = new_val
 
 # ============================================================
 # 🧾 Tabla comparativa con resaltado de cambios (sin 'campaign')
 # ============================================================
-# Crear dataframe comparativo
 comparacion = pd.DataFrame({
     "Variable": base_row.columns,
     "Valor original": base_row.iloc[0].values,
     "Valor modificado": new_row.iloc[0].values
 })
 
-# Excluir la variable 'campaign'
 comparacion = comparacion[comparacion["Variable"] != "campaign"].reset_index(drop=True)
 
-# Función para resaltar cambios
 def highlight_changes(row):
     orig = row["Valor original"]
     mod = row["Valor modificado"]
@@ -215,19 +242,19 @@ def highlight_changes(row):
         return [""] * 3
     if isinstance(orig, (int, float)) and isinstance(mod, (int, float)):
         if mod > orig:
-            return ["", "background-color: #f0f0f0", "background-color: #d0f0c0"]  # verde suave
+            return ["", "background-color: #1E1E1E", "background-color: #C6EFCE; color: black;"]
         elif mod < orig:
-            return ["", "background-color: #f0f0f0", "background-color: #f5b7b1"]  # rojo suave
+            return ["", "background-color: #1E1E1E", "background-color: #FFC7CE; color: black;"]
     else:
         if orig != mod:
-            return ["", "background-color: #f0f0f0", "background-color: #f9e79f"]  # amarillo
+            return ["", "background-color: #1E1E1E", "background-color: #FFF2CC; color: black;"]
     return [""] * 3
 
 st.write("### 🧾 Comparativa de valores del cliente")
 st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_width=True)
 
 # ============================================================
-# 🧩 Predicción y SHAP — versión nativa con comparación Before/After
+# 🧩 Predicción y SHAP — Comparación Before/After
 # ============================================================
 try:
     cleaner = modelo_pipeline.named_steps["cleaner"]
@@ -237,7 +264,6 @@ except KeyError:
     st.error("❌ El pipeline no contiene 'cleaner' o 'preprocessor'. Revisa los nombres de pasos.")
     st.stop()
 
-# --- Preparar datos "antes" y "después" ---
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
 
@@ -247,21 +273,16 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 X_before = base_row_preprocessed.values if hasattr(base_row_preprocessed, "values") else base_row_preprocessed
 X_after = new_row_preprocessed.values if hasattr(new_row_preprocessed, "values") else new_row_preprocessed
 
-# --- Crear background ---
 background_raw = df.sample(min(bg_size, len(df)), random_state=42)
 background_clean = cleaner.transform(background_raw)
 background_preprocessed = preprocessor.transform(background_clean)
 background_array = background_preprocessed.values if hasattr(background_preprocessed, "values") else background_preprocessed
 
-# --- Crear explainer ---
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
-# ============================================================
-# 💧 Comparación de Waterfalls
-# ============================================================
 st.write(f"💧 Mostrando comparativa SHAP para cliente índice **{row_selector}**")
 
 try:
@@ -292,7 +313,7 @@ prob_after = expit(exp_after.base_values + exp_after.values.sum())
 st.markdown("### 📊 Comparativa de Probabilidades")
 colA, colB = st.columns(2)
 colA.metric("Probabilidad original", f"{prob_before:.4f}")
-colB.metric("Probabilidad modificada", f"{prob_after:.4f}",
+colB.metric("Probabilidad modificada", f"{prob_after:.4f}", 
              delta=f"{(prob_after - prob_before)*100:+.2f} pp")
 
 col1, col2 = st.columns(2)
