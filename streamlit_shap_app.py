@@ -452,6 +452,6 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     pptx_stream.seek(0)
     return pptx_stream
 
- pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
- st.download_button("📥 Descargar resultados en PPTX", pptx_stream,
-                    file_name="simulacion_resultados.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
+st.download_button("📥 Descargar resultados en PPTX", pptx_stream,
+                   file_name="simulacion_resultados.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
