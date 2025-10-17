@@ -337,66 +337,95 @@ st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las m�
 from pptx.dml.color import RGBColor
 from pptx.util import Pt
 
-def create_pptx_with_table():
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
+from io import BytesIO
+
+def create_pptx_with_shap():
     prs = Presentation()
-    slide_layout = prs.slide_layouts[5]  # Layout en blanco
-
-    # --- DIAPOSITIVA 1: Resumen y gráficos ---
+    slide_layout = prs.slide_layouts[5]  # Blanco
+    
+    # --- Slide 1: Probabilidades y tabla comparativa ---
     slide1 = prs.slides.add_slide(slide_layout)
-    slide1.shapes.title.text = f"Cliente índice {row_selector} - Resumen"
+    slide1.background.fill.solid()
+    slide1.background.fill.fore_color.rgb = RGBColor(245, 245, 245)  # gris claro
 
-    # Resumen de probabilidades
-    txBox = slide1.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(1))
-    tf = txBox.text_frame
-    p = tf.paragraphs[0]
-    p.text = f"Probabilidad original: {prob_before:.4f}\nProbabilidad modificada: {prob_after:.4f}"
+    # Título
+    title1 = slide1.shapes.title
+    title1.text = f"Cliente índice {row_selector} - Resumen"
+    title1.text_frame.paragraphs[0].font.size = Pt(24)
+    title1.text_frame.paragraphs[0].font.bold = True
+    title1.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 51, 102)
+
+    # Cuadros de probabilidades
+    txBox_before = slide1.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(4), Inches(0.8))
+    tfb = txBox_before.text_frame
+    p = tfb.paragraphs[0]
+    p.text = f"Probabilidad original: {prob_before:.4f}"
     p.font.size = Pt(18)
     p.font.bold = True
     p.font.color.rgb = RGBColor(255,255,255)
-    txBox.fill.solid()
-    txBox.fill.fore_color.rgb = RGBColor(60,60,60)  # fondo oscuro
+    txBox_before.fill.solid()
+    txBox_before.fill.fore_color.rgb = RGBColor(0, 102, 204)  # azul
 
-    # Guardar figuras como imágenes temporales
-    fig1.savefig("/tmp/fig1.png", bbox_inches='tight')
-    fig2.savefig("/tmp/fig2.png", bbox_inches='tight')
+    txBox_after = slide1.shapes.add_textbox(Inches(5), Inches(1.5), Inches(4), Inches(0.8))
+    tfa = txBox_after.text_frame
+    p = tfa.paragraphs[0]
+    p.text = f"Probabilidad modificada: {prob_after:.4f}"
+    p.font.size = Pt(18)
+    p.font.bold = True
+    p.font.color.rgb = RGBColor(255,255,255)
+    txBox_after.fill.solid()
+    txBox_after.fill.fore_color.rgb = RGBColor(0, 153, 76)  # verde
 
-    # Añadir gráficos
-    slide1.shapes.add_picture("/tmp/fig1.png", Inches(0.5), Inches(2.5), width=Inches(4.5))
-    slide1.shapes.add_picture("/tmp/fig2.png", Inches(5), Inches(2.5), width=Inches(4.5))
-
-    # --- DIAPOSITIVA 2: Tabla comparativa ---
-    slide2 = prs.slides.add_slide(slide_layout)
-    slide2.shapes.title.text = "Comparativa de variables"
-
+    # Tabla comparativa
     rows = comparacion.shape[0] + 1
     cols = comparacion.shape[1]
-
     left = Inches(0.5)
-    top = Inches(1.5)
+    top = Inches(2.5)
     width = Inches(9)
     height = Inches(0.8 + 0.25*rows)
 
-    table = slide2.shapes.add_table(rows, cols, left, top, width, height).table
-
+    table = slide1.shapes.add_table(rows, cols, left, top, width, height).table
     # Encabezados
     for j, col_name in enumerate(comparacion.columns):
         table.cell(0,j).text = col_name
-        table.cell(0,j).text_frame.paragraphs[0].font.bold = True
         table.cell(0,j).fill.solid()
-        table.cell(0,j).fill.fore_color.rgb = RGBColor(0, 102, 204)
+        table.cell(0,j).fill.fore_color.rgb = RGBColor(0, 51, 102)
         table.cell(0,j).text_frame.paragraphs[0].font.color.rgb = RGBColor(255,255,255)
         table.cell(0,j).text_frame.paragraphs[0].font.size = Pt(12)
+        table.cell(0,j).text_frame.paragraphs[0].font.bold = True
 
-    # Rellenar datos
+    # Datos
     for i in range(1, rows):
         for j in range(cols):
             val = comparacion.iloc[i-1,j]
             table.cell(i,j).text = str(val)
             table.cell(i,j).text_frame.paragraphs[0].font.size = Pt(11)
-            # Resaltar cambios
+            # Resaltar cambios en columna "Valor modificado"
             if j==2 and comparacion.iloc[i-1,1] != comparacion.iloc[i-1,2]:
                 table.cell(i,j).fill.solid()
-                table.cell(i,j).fill.fore_color.rgb = RGBColor(198,239,206)  # verde claro para modificado
+                table.cell(i,j).fill.fore_color.rgb = RGBColor(198,239,206)  # verde claro
+
+    # --- Slide 2: SHAP original ---
+    slide2 = prs.slides.add_slide(slide_layout)
+    slide2.background.fill.solid()
+    slide2.background.fill.fore_color.rgb = RGBColor(255,255,255)
+    slide2.shapes.title.text = "SHAP valores originales"
+
+    # Guardar figura SHAP original y añadir
+    fig1.savefig("/tmp/shap_before.png", bbox_inches='tight')
+    slide2.shapes.add_picture("/tmp/shap_before.png", Inches(1), Inches(1.5), width=Inches(8))
+
+    # --- Slide 3: SHAP modificado ---
+    slide3 = prs.slides.add_slide(slide_layout)
+    slide3.background.fill.solid()
+    slide3.background.fill.fore_color.rgb = RGBColor(255,255,255)
+    slide3.shapes.title.text = "SHAP valores modificados"
+
+    fig2.savefig("/tmp/shap_after.png", bbox_inches='tight')
+    slide3.shapes.add_picture("/tmp/shap_after.png", Inches(1), Inches(1.5), width=Inches(8))
 
     # Guardar PPTX en memoria
     pptx_bytes = BytesIO()
@@ -404,5 +433,5 @@ def create_pptx_with_table():
     pptx_bytes.seek(0)
     return pptx_bytes
 
-pptx_data = create_pptx_with_table()
-st.download_button("⬇️ Descargar PPTX con resultados", pptx_data, file_name="simulacion_deposito_formato.pptx")
+pptx_data = create_pptx_with_shap()
+st.download_button("⬇️ Descargar PPTX completo", pptx_data, file_name="simulacion_deposito_completa.pptx")
