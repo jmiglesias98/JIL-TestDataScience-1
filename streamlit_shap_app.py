@@ -348,76 +348,136 @@ with col2:
 # ============================================================
 def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
     prs = Presentation()
+
+    # Tamaño de diapositiva
     SLIDE_WIDTH = prs.slide_width
     SLIDE_HEIGHT = prs.slide_height
+
+    # 🎨 Colores
+    bg_color = RGBColor(240, 240, 240)  # gris claro
+    title_bg = RGBColor(0, 102, 102)    # verde cian oscuro
+    prob_bg_before = RGBColor(0, 102, 102)
+    prob_bg_after = RGBColor(0, 102, 102)
     text_color = RGBColor(255, 255, 255)
-    title_bg = RGBColor(70, 70, 70)
-    prob_bg_before = RGBColor(0, 102, 204)
-    prob_bg_after = RGBColor(204, 0, 0)
-    table_fill = RGBColor(60, 60, 60)
+    table_fill = RGBColor(230, 230, 230)
+    table_text = RGBColor(0, 0, 0)
+
+    # Aplicar fondo a todas las diapositivas
+    def apply_slide_bg(slide):
+        background = slide.background
+        fill = background.fill
+        fill.solid()
+        fill.fore_color.rgb = bg_color
 
     def add_title_box(slide, text, top):
-        box = slide.shapes.add_textbox(Inches(0.5), top, SLIDE_WIDTH - Inches(1), Inches(0.6))
-        box.fill.solid(); box.fill.fore_color.rgb = title_bg
-        tf = box.text_frame; tf.text = text
-        tf.paragraphs[0].font.size = Pt(14); tf.paragraphs[0].font.bold = True
-        tf.paragraphs[0].font.color.rgb = text_color; tf.paragraphs[0].alignment = 1
+        width = SLIDE_WIDTH - Inches(1.0)
+        left = Inches(0.5)
+        height = Inches(0.6)
+        box = slide.shapes.add_textbox(left, top, width, height)
+        box.fill.solid()
+        box.fill.fore_color.rgb = title_bg
+        tf = box.text_frame
+        tf.text = text
+        tf.paragraphs[0].font.size = Pt(16)
+        tf.paragraphs[0].font.bold = True
+        tf.paragraphs[0].font.color.rgb = text_color
+        tf.paragraphs[0].alignment = 1  # centrado
+        return box
 
     def add_prob_box(slide, left, top, width, height, text, bg):
         box = slide.shapes.add_textbox(left, top, width, height)
-        box.fill.solid(); box.fill.fore_color.rgb = bg
-        tf = box.text_frame; tf.text = text; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        box.fill.solid()
+        box.fill.fore_color.rgb = bg
+        tf = box.text_frame
+        tf.text = text
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
         for p in tf.paragraphs:
-            p.font.size = Pt(13); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = 1
+            p.font.size = Pt(14)
+            p.font.color.rgb = RGBColor(255, 255, 255)
+            p.alignment = 1
+        return box
 
-    def add_table(slide, df, top):
+    def add_table_from_df(slide, df, top, total_width, left_margin_ratio=0.05):
         n_rows, n_cols = df.shape
-        table = slide.shapes.add_table(rows=n_rows+1, cols=n_cols,
-                                       left=Inches(0.5), top=top,
-                                       width=SLIDE_WIDTH - Inches(1),
-                                       height=Inches(4.5)).table
+        left = int(SLIDE_WIDTH * left_margin_ratio)
+        width = int(SLIDE_WIDTH * (1 - 2 * left_margin_ratio))
+
+        # Altura dinámica según número de filas
+        base_height = Inches(5)
+        height = base_height if n_rows < 12 else Inches(5.5)
+        if n_rows > 18:
+            height = Inches(6)
+        table = slide.shapes.add_table(
+            rows=n_rows + 1, cols=n_cols,
+            left=left, top=int(top.emu),
+            width=width, height=int(height.emu)
+        ).table
+
+        # Ajuste de tamaño de fuente dinámico
+        font_size = 12
+        if n_rows > 12:
+            font_size = 10
+        if n_rows > 18:
+            font_size = 8
+
+        # Cabeceras
         for j, col_name in enumerate(df.columns):
-            cell = table.cell(0, j); cell.text = str(col_name)
-            cell.fill.solid(); cell.fill.fore_color.rgb = table_fill
+            cell = table.cell(0, j)
+            cell.text = str(col_name)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = title_bg
+            cell.text_frame.paragraphs[0].font.size = Pt(font_size)
             cell.text_frame.paragraphs[0].font.bold = True
             cell.text_frame.paragraphs[0].font.color.rgb = text_color
+            cell.text_frame.paragraphs[0].alignment = 1
+
+        # Datos
         for i in range(n_rows):
             for j in range(n_cols):
-                cell = table.cell(i+1, j)
+                cell = table.cell(i + 1, j)
                 cell.text = str(df.iloc[i, j])
-                cell.fill.solid(); cell.fill.fore_color.rgb = table_fill
-                cell.text_frame.paragraphs[0].font.color.rgb = text_color
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = table_fill
+                cell.text_frame.paragraphs[0].font.size = Pt(font_size)
+                cell.text_frame.paragraphs[0].font.color.rgb = table_text
+                cell.text_frame.paragraphs[0].alignment = 1
 
-    def add_existing_figure_slide(prs, fig, title_text):
+        col_width = int(width / n_cols)
+        for j in range(n_cols):
+            table.columns[j].width = col_width
+
+        return table
+
+    def add_figure_slide(prs, fig, title_text):
         slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_title_box(slide, title_text, Inches(0.3))
-        img_stream = BytesIO(); fig.savefig(img_stream, bbox_inches='tight', dpi=150)
+        apply_slide_bg(slide)
+        add_title_box(slide, title_text, top=Inches(0.3))
+        img_stream = io.BytesIO()
+        fig.savefig(img_stream, bbox_inches="tight", facecolor="white")
         img_stream.seek(0)
         slide.shapes.add_picture(img_stream, Inches(0.5), Inches(1.0),
-                                 width=SLIDE_WIDTH - Inches(1),
+                                 width=SLIDE_WIDTH - Inches(1.0),
                                  height=SLIDE_HEIGHT - Inches(1.5))
+        return slide
 
-    # Slide 1: Probabilidades + tabla
+    # --- Slide 1 ---
     slide1 = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title_box(slide1, "Resultados de la simulación", Inches(0.3))
+    apply_slide_bg(slide1)
+    add_title_box(slide1, "Resultados de la simulación", top=Inches(0.3))
     margin = Inches(0.5)
-    bw = (SLIDE_WIDTH - 3*margin)/2
-    add_prob_box(slide1, margin, Inches(1), bw, Inches(0.8),
+    box_width = (SLIDE_WIDTH - 3 * margin) / 2
+    box_height = Inches(0.8)
+    add_prob_box(slide1, margin, Inches(1.0), box_width, box_height,
                  f"Probabilidad original: {prob_before:.4f}", prob_bg_before)
-    add_prob_box(slide1, 2*margin + bw, Inches(1), bw, Inches(0.8),
+    add_prob_box(slide1, 2 * margin + box_width, Inches(1.0), box_width, box_height,
                  f"Probabilidad modificada: {prob_after:.4f}", prob_bg_after)
-    add_table(slide1, comparacion_df, Inches(2))
+    add_table_from_df(slide1, comparacion_df, top=Inches(2.0), total_width=SLIDE_WIDTH)
 
-    # Slide 2 y 3 con figuras reales
-    add_existing_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
-    add_existing_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
+    # --- Slide 2 y 3 ---
+    add_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
+    add_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
 
-    pptx_stream = BytesIO()
+    pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     pptx_stream.seek(0)
     return pptx_stream
-
-pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
-st.download_button("📥 Descargar resultados en PPTX", pptx_stream,
-                   file_name="simulacion_resultados.pptx",
-                   mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
