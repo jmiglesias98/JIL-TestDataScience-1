@@ -481,3 +481,12 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     prs.save(pptx_stream)
     pptx_stream.seek(0)
     return pptx_stream
+
+file_name = f"simulacion_resultados_cliente_{row_selector}.pptx"
+
+st.download_button(
+    label="📥 Descargar  PPTX",
+    data=pptx_stream,
+    file_name=file_name,
+    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+)
