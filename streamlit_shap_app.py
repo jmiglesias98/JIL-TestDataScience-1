@@ -22,20 +22,22 @@ from sklearn.pipeline import Pipeline
 st.set_page_config(layout="wide", page_title="Simulador de contratación de depósitos")
 st.title("Simulador de contratación de depósitos")
 
-# 🌙 Forzar modo oscuro
+# ============================================================
+# 🌙 Forzar modo oscuro (CSS)
+# ============================================================
 st.markdown(
     """
     <style>
-    body, .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
-    }
-    .stDataFrame {
-        background-color: #0e1117 !important;
-    }
-    .stSlider label, .stSelectbox label, .stTextInput label, .stMarkdown {
-        color: #fafafa !important;
-    }
+    /* Fondo y texto principales */
+    .stApp, .css-18e3th9 { background-color: #0b0f14; color: #e6eef6; }
+    /* Asegurar que los headers/labels sean legibles */
+    .css-1d391kg, .css-1x8cf1d, .css-1v0mbdj, .stMarkdown, label { color: #e6eef6 !important; }
+    /* DataFrame / tablas */
+    .stDataFrame>div>div>div>div { background-color: #0b0f14 !important; color: #e6eef6 !important; }
+    /* Mejor contraste para inputs y selects */
+    .stSelectbox, .stTextInput, .stSlider { color: #e6eef6 !important; }
+    /* Make st.dataframe container dark */
+    .element-container { background-color: #0b0f14 !important; }
     </style>
     """,
     unsafe_allow_html=True
@@ -145,7 +147,7 @@ def load_model_from_bytes(bts):
     return joblib.load(BytesIO(bts))
 
 # ============================================================
-# ⚙️ Cargar datos y modelo
+# ⚙️ Cargar datos y modelo (sin mensajes de éxito)
 # ============================================================
 try:
     csv_bytes = fetch_url(CSV_URL)
@@ -184,10 +186,8 @@ base_row = df.iloc[row_selector:row_selector+1].copy()
 # ============================================================
 # ✏️ Controles What-If
 # ============================================================
-if "selected_row" not in st.session_state or st.session_state["selected_row"] != row_selector:
-    st.session_state["selected_row"] = row_selector
-    st.session_state["mod_values"] = {}
-
+# ---> CLAVE: usamos keys que incluyen el row_selector, así al cambiar de cliente
+#       los widgets son distintos y se reinician automáticamente.
 col1, col2 = st.columns(2)
 new_row = base_row.copy()
 numeric_cols = new_row.select_dtypes(include=[np.number]).columns.tolist()
@@ -196,6 +196,7 @@ cat_cols = [c for c in features if c not in numeric_cols]
 with col1:
     st.subheader("🔢 Numéricos")
     for c in numeric_cols:
+        # calcular rangos para slider
         col_min = float(df[c].quantile(0.01))
         col_max = float(df[c].quantile(0.99))
         col_val = float(base_row.iloc[0][c])
@@ -204,25 +205,28 @@ with col1:
         v_max = max(col_max, col_val + delta)
         step = (v_max-v_min)/100 if v_max>v_min else 1.0
 
-        default_val = st.session_state["mod_values"].get(c, col_val)
-        new_val = st.slider(c, min_value=v_min, max_value=v_max, value=default_val, step=step)
+        # key incluye el índice del cliente
+        widget_key = f"slider_row{row_selector}_{c}"
+        # el valor por defecto se toma del cliente actual (base_row)
+        new_val = st.slider(c, min_value=v_min, max_value=v_max, value=col_val, step=step, key=widget_key)
         new_row.at[new_row.index[0], c] = new_val
-        st.session_state["mod_values"][c] = new_val
 
 with col2:
     st.subheader("🏷️ Categóricas / Otros")
     for c in cat_cols:
         uniques = df[c].dropna().unique().tolist()
         default = base_row.iloc[0][c] if c in base_row.columns else (uniques[0] if uniques else "")
+
+        widget_key = f"input_row{row_selector}_{c}"
+
         if len(uniques) <= 20 and len(uniques) > 0:
-            default_val = st.session_state["mod_values"].get(c, default)
-            new_val = st.selectbox(c, options=uniques, index=uniques.index(default_val) if default_val in uniques else 0)
+            # necesitamos calcular el índice por si default no está en uniques
+            default_index = uniques.index(default) if default in uniques else 0
+            new_val = st.selectbox(c, options=uniques, index=default_index, key=widget_key)
         else:
-            default_val = st.session_state["mod_values"].get(c, str(default))
-            new_val = st.text_input(f"{c} (valor)", value=default_val)
+            new_val = st.text_input(f"{c} (valor)", value=str(default), key=widget_key)
 
         new_row.at[new_row.index[0], c] = new_val
-        st.session_state["mod_values"][c] = new_val
 
 # ============================================================
 # 🧾 Tabla comparativa con resaltado de cambios (sin 'campaign')
@@ -233,28 +237,38 @@ comparacion = pd.DataFrame({
     "Valor modificado": new_row.iloc[0].values
 })
 
+# Excluir la variable 'campaign'
 comparacion = comparacion[comparacion["Variable"] != "campaign"].reset_index(drop=True)
 
+# Colores contrastados y legibles en modo oscuro
+# - Verde claro para aumento
+# - Rojo claro para disminución
+# - Amarillo claro para cambio categórico
 def highlight_changes(row):
     orig = row["Valor original"]
     mod = row["Valor modificado"]
     if pd.isna(orig) or pd.isna(mod):
         return [""] * 3
-    if isinstance(orig, (int, float)) and isinstance(mod, (int, float)):
-        if mod > orig:
-            return ["", "background-color: #1E1E1E", "background-color: #C6EFCE; color: black;"]
-        elif mod < orig:
-            return ["", "background-color: #1E1E1E", "background-color: #FFC7CE; color: black;"]
-    else:
-        if orig != mod:
-            return ["", "background-color: #1E1E1E", "background-color: #FFF2CC; color: black;"]
+    # numéricos
+    try:
+        # Intentar convertir a float para comparaciones seguras
+        orig_f = float(orig)
+        mod_f = float(mod)
+        if mod_f > orig_f:
+            return ["", "background-color: #0b0f14", "background-color: #2ecc71; color: black; font-weight:600;"]  # verde brillante
+        elif mod_f < orig_f:
+            return ["", "background-color: #0b0f14", "background-color: #ff6b6b; color: black; font-weight:600;"]  # rojo
+    except Exception:
+        # no numérico -> categórico
+        if str(orig) != str(mod):
+            return ["", "background-color: #0b0f14", "background-color: #ffd166; color: black; font-weight:600;"]  # amarillo
     return [""] * 3
 
 st.write("### 🧾 Comparativa de valores del cliente")
 st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_width=True)
 
 # ============================================================
-# 🧩 Predicción y SHAP — Comparación Before/After
+# 🧩 Predicción y SHAP — versión nativa con comparación Before/After
 # ============================================================
 try:
     cleaner = modelo_pipeline.named_steps["cleaner"]
@@ -264,6 +278,7 @@ except KeyError:
     st.error("❌ El pipeline no contiene 'cleaner' o 'preprocessor'. Revisa los nombres de pasos.")
     st.stop()
 
+# --- Preparar datos "antes" y "después" ---
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
 
@@ -273,16 +288,21 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 X_before = base_row_preprocessed.values if hasattr(base_row_preprocessed, "values") else base_row_preprocessed
 X_after = new_row_preprocessed.values if hasattr(new_row_preprocessed, "values") else new_row_preprocessed
 
+# --- Crear background ---
 background_raw = df.sample(min(bg_size, len(df)), random_state=42)
 background_clean = cleaner.transform(background_raw)
 background_preprocessed = preprocessor.transform(background_clean)
 background_array = background_preprocessed.values if hasattr(background_preprocessed, "values") else background_preprocessed
 
+# --- Crear explainer ---
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
+# ============================================================
+# 💧 Comparación de Waterfalls
+# ============================================================
 st.write(f"💧 Mostrando comparativa SHAP para cliente índice **{row_selector}**")
 
 try:
@@ -313,7 +333,7 @@ prob_after = expit(exp_after.base_values + exp_after.values.sum())
 st.markdown("### 📊 Comparativa de Probabilidades")
 colA, colB = st.columns(2)
 colA.metric("Probabilidad original", f"{prob_before:.4f}")
-colB.metric("Probabilidad modificada", f"{prob_after:.4f}", 
+colB.metric("Probabilidad modificada", f"{prob_after:.4f}",
              delta=f"{(prob_after - prob_before)*100:+.2f} pp")
 
 col1, col2 = st.columns(2)
