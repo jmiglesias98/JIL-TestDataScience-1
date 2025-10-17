@@ -20,13 +20,15 @@ El proyecto combina análisis exploratorio de datos, construcción y evaluación
 
 A continuación se enumeran los distintos scripts utilizados en la operativización del producto.
 
-| Archivo                         | Descripción |
-|---------------------------------|-------------|
-| `app.py`                        | Implementa la API RESTful utilizando FastAPI para interactuar con el modelo entrenado. |
-| `predict.py`                    | Contiene funciones para cargar el modelo y realizar predicciones sobre nuevos datos. |
-| `preprocessing.py`              | Incluye funciones para preprocesar datos antes de la predicción, como la normalización y transformación de variables. |
-| `utils.py`                      | Proporciona funciones auxiliares utilizadas en todo el proyecto, como manejo de errores y validación de entradas. |
-
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+| `__init__.py`               | Archivo de inicialización del paquete `src`, permite importar módulos como un paquete de Python. |
+| `app.py`                    | Implementa la API RESTful (probablemente con FastAPI) para interactuar con el modelo entrenado y exponer endpoints de predicción. |
+| `data_cleaner.py`           | Contiene funciones para limpieza y preparación de datos antes del análisis o predicción. |
+| `preprocesador_dinamico.py`| Contiene un preprocesador flexible/dinámico que adapta los datos a la estructura requerida por el modelo. |
+| `load_model.py`             | Se encarga de cargar el modelo entrenado desde almacenamiento persistente para su uso en predicciones. |
+| `inference.py`              | Funciones para realizar inferencias/predicciones usando el modelo entrenado. |
+| `streamlit_app.py`          | Aplicación web interactiva usando Streamlit para que el equipo de Marketing pueda realizar simulaciones What-If. |
 
 ## Requisitos
 
