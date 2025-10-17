@@ -337,60 +337,73 @@ st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las m�
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 from io import BytesIO
 
-def create_pptx_dark():
+def create_pptx_dark_improved():
     prs = Presentation()
-    slide_layout = prs.slide_layouts[5]  # Blanco (se sobreescribe fondo)
+    slide_layout = prs.slide_layouts[5]  # Blanco (sobreescribimos fondo)
 
     dark_bg = RGBColor(34, 34, 34)  # fondo oscuro
-    title_color = RGBColor(255, 255, 255)  # títulos en blanco
+    title_bg_color = RGBColor(220, 220, 220)  # recuadro título claro
+    title_text_color = RGBColor(34, 34, 34)   # texto título oscuro
     prob_text_color = RGBColor(255, 255, 255)  # texto probabilidades
-    table_header_color = RGBColor(0, 102, 204)  # azul oscuro para headers
-    table_text_color = RGBColor(255, 255, 255)  # texto tabla en blanco
-    table_highlight_color = RGBColor(0, 153, 76)  # verde oscuro para cambios
+    table_header_color = RGBColor(255, 255, 255)  # encabezados tabla blancos
+    table_cell_bg = RGBColor(55, 55, 55)  # celdas fondo oscuro
+    table_text_color = RGBColor(255, 255, 255)  # texto tabla blanco
+    table_highlight_up = RGBColor(0, 255, 0)  # verde para incremento
+    table_highlight_down = RGBColor(255, 0, 0)  # rojo para decremento
+
+    # --- Función auxiliar para centrar texto ---
+    def center_paragraph(cell):
+        for p in cell.text_frame.paragraphs:
+            p.alignment = PP_ALIGN.CENTER
+            p.font.size = Pt(12)
+            p.font.color.rgb = table_text_color
+            p.font.bold = False
 
     # --- Slide 1: Resumen ---
     slide1 = prs.slides.add_slide(slide_layout)
     slide1.background.fill.solid()
     slide1.background.fill.fore_color.rgb = dark_bg
 
-    # Título
-    title1 = slide1.shapes.title
-    title1.text = f"Cliente índice {row_selector} - Resumen"
-    p = title1.text_frame.paragraphs[0]
-    p.font.size = Pt(12)
-    p.font.bold = True
-    p.font.color.rgb = title_color
+    # Título con recuadro
+    title_box = slide1.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.5))
+    title_box.fill.solid()
+    title_box.fill.fore_color.rgb = title_bg_color
+    tf = title_box.text_frame
+    tf.text = f"Cliente índice {row_selector} - Resumen"
+    tf.paragraphs[0].font.size = Pt(12)
+    tf.paragraphs[0].font.bold = True
+    tf.paragraphs[0].font.color.rgb = title_text_color
+    tf.paragraphs[0].alignment = PP_ALIGN.CENTER
 
-    # Cuadros de probabilidades
-    txBox_before = slide1.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(4), Inches(0.8))
-    tfb = txBox_before.text_frame
-    p = tfb.paragraphs[0]
-    p.text = f"Probabilidad original: {prob_before:.4f}"
-    p.font.size = Pt(12)
-    p.font.bold = True
-    p.font.color.rgb = prob_text_color
-    txBox_before.fill.solid()
-    txBox_before.fill.fore_color.rgb = RGBColor(0, 102, 204)  # azul
+    # Cuadros de probabilidades centrados
+    def add_prob_box(left, top, width, height, text, bg_color):
+        box = slide1.shapes.add_textbox(left, top, width, height)
+        box.fill.solid()
+        box.fill.fore_color.rgb = bg_color
+        tfb = box.text_frame
+        tfb.text = text
+        p = tfb.paragraphs[0]
+        p.font.size = Pt(12)
+        p.font.bold = True
+        p.font.color.rgb = prob_text_color
+        p.alignment = PP_ALIGN.CENTER
+        tfb.vertical_anchor = "middle"
 
-    txBox_after = slide1.shapes.add_textbox(Inches(5), Inches(1.5), Inches(4), Inches(0.8))
-    tfa = txBox_after.text_frame
-    p = tfa.paragraphs[0]
-    p.text = f"Probabilidad modificada: {prob_after:.4f}"
-    p.font.size = Pt(12)
-    p.font.bold = True
-    p.font.color.rgb = prob_text_color
-    txBox_after.fill.solid()
-    txBox_after.fill.fore_color.rgb = RGBColor(0, 153, 76)  # verde
+    add_prob_box(Inches(0.5), Inches(1.0), Inches(4), Inches(0.8),
+                 f"Probabilidad original: {prob_before:.4f}", RGBColor(0, 102, 204))
+    add_prob_box(Inches(5), Inches(1.0), Inches(4), Inches(0.8),
+                 f"Probabilidad modificada: {prob_after:.4f}", RGBColor(0, 153, 76))
 
     # Tabla comparativa
     rows = comparacion.shape[0] + 1
     cols = comparacion.shape[1]
     left = Inches(0.5)
-    top = Inches(2.5)
+    top = Inches(2.0)
     width = Inches(9)
-    height = Inches(0.8 + 0.25*rows)
+    height = Inches(0.25*rows + 0.5)
 
     table = slide1.shapes.add_table(rows, cols, left, top, width, height).table
 
@@ -400,52 +413,68 @@ def create_pptx_dark():
         cell.text = col_name
         cell.fill.solid()
         cell.fill.fore_color.rgb = table_header_color
-        para = cell.text_frame.paragraphs[0]
-        para.font.size = Pt(12)
-        para.font.bold = True
-        para.font.color.rgb = table_text_color
+        cell.text_frame.paragraphs[0].font.size = Pt(12)
+        cell.text_frame.paragraphs[0].font.bold = True
+        cell.text_frame.paragraphs[0].font.color.rgb = dark_bg  # texto oscuro
+        cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
-    # Datos
+    # Celdas
     for i in range(1, rows):
         for j in range(cols):
             val = comparacion.iloc[i-1,j]
             cell = table.cell(i,j)
             cell.text = str(val)
-            cell.text_frame.paragraphs[0].font.size = Pt(12)
-            cell.text_frame.paragraphs[0].font.color.rgb = table_text_color
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = table_cell_bg
+            center_paragraph(cell)
+
             # Resaltar cambios en columna "Valor modificado"
-            if j==2 and comparacion.iloc[i-1,1] != comparacion.iloc[i-1,2]:
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = table_highlight_color
+            if j==2:
+                orig = comparacion.iloc[i-1,1]
+                mod = comparacion.iloc[i-1,2]
+                if mod > orig:
+                    cell.fill.fore_color.rgb = table_highlight_up
+                elif mod < orig:
+                    cell.fill.fore_color.rgb = table_highlight_down
 
     # --- Slide 2: SHAP original ---
     slide2 = prs.slides.add_slide(slide_layout)
     slide2.background.fill.solid()
     slide2.background.fill.fore_color.rgb = dark_bg
-    slide2.shapes.title.text = "SHAP valores originales"
-    slide2.shapes.title.text_frame.paragraphs[0].font.size = Pt(12)
-    slide2.shapes.title.text_frame.paragraphs[0].font.color.rgb = title_color
+    title_box2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.5))
+    title_box2.fill.solid()
+    title_box2.fill.fore_color.rgb = title_bg_color
+    tf2 = title_box2.text_frame
+    tf2.text = "SHAP valores originales"
+    tf2.paragraphs[0].font.size = Pt(12)
+    tf2.paragraphs[0].font.color.rgb = title_text_color
+    tf2.paragraphs[0].alignment = PP_ALIGN.CENTER
 
-    fig1.savefig("/tmp/shap_before.png", bbox_inches='tight')
-    slide2.shapes.add_picture("/tmp/shap_before.png", Inches(1), Inches(1.5), width=Inches(8))
+    fig1.savefig("/tmp/shap_before.png", bbox_inches='tight', facecolor='white')
+    slide2.shapes.add_picture("/tmp/shap_before.png", Inches(1), Inches(1.0), width=Inches(8))
 
     # --- Slide 3: SHAP modificado ---
     slide3 = prs.slides.add_slide(slide_layout)
     slide3.background.fill.solid()
     slide3.background.fill.fore_color.rgb = dark_bg
-    slide3.shapes.title.text = "SHAP valores modificados"
-    slide3.shapes.title.text_frame.paragraphs[0].font.size = Pt(12)
-    slide3.shapes.title.text_frame.paragraphs[0].font.color.rgb = title_color
+    title_box3 = slide3.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.5))
+    title_box3.fill.solid()
+    title_box3.fill.fore_color.rgb = title_bg_color
+    tf3 = title_box3.text_frame
+    tf3.text = "SHAP valores modificados"
+    tf3.paragraphs[0].font.size = Pt(12)
+    tf3.paragraphs[0].font.color.rgb = title_text_color
+    tf3.paragraphs[0].alignment = PP_ALIGN.CENTER
 
-    fig2.savefig("/tmp/shap_after.png", bbox_inches='tight')
-    slide3.shapes.add_picture("/tmp/shap_after.png", Inches(1), Inches(1.5), width=Inches(8))
+    fig2.savefig("/tmp/shap_after.png", bbox_inches='tight', facecolor='white')
+    slide3.shapes.add_picture("/tmp/shap_after.png", Inches(1), Inches(1.0), width=Inches(8))
 
-    # Guardar PPTX en memoria
     pptx_bytes = BytesIO()
     prs.save(pptx_bytes)
     pptx_bytes.seek(0)
     return pptx_bytes
 
-pptx_data = create_pptx_dark()
-st.download_button("⬇️ Descargar PPTX", pptx_data, file_name="simulacion_deposito.pptx")
+pptx_data = create_pptx_dark_improved()
+st.download_button("⬇️ Descargar PPTX", pptx_data,
+                   file_name="simulacion_deposito.pptx")
 
