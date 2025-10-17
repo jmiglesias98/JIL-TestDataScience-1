@@ -19,24 +19,29 @@ from sklearn.pipeline import Pipeline
 # Para generar PPTX
 try:
     from pptx import Presentation
-    from pptx.util import Inches
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import MSO_ANCHOR
 except ModuleNotFoundError:
     import subprocess, sys
     subprocess.check_call([sys.executable, "-m", "pip", "install", "python-pptx"])
     from pptx import Presentation
-    from pptx.util import Inches
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import MSO_ANCHOR
 
 # ============================================================
 # ⚙️ Configuración de la app
 # ============================================================
 st.set_page_config(layout="wide", page_title="Simulador de contratación de depósitos",
                    initial_sidebar_state="expanded")
+
 # Forzar tema oscuro mediante CSS
 st.markdown(
     """
     <style>
-    .css-18e3th9 {background-color: #0E1117;}  /* Fondo principal */
-    .css-1d391kg {color: #FFFFFF;}  /* Texto blanco */
+    .css-18e3th9 {background-color: #0E1117;}
+    .css-1d391kg {color: #FFFFFF;}
     .st-bf {color: #FFFFFF;}
     </style>
     """, unsafe_allow_html=True
@@ -153,7 +158,7 @@ def load_model_from_bytes(bts):
     return joblib.load(BytesIO(bts))
 
 # ============================================================
-# ⚙️ Cargar datos y modelo (sin mensajes de éxito)
+# ⚙️ Cargar datos y modelo
 # ============================================================
 try:
     csv_bytes = fetch_url(CSV_URL)
@@ -190,7 +195,7 @@ row_selector = st.sidebar.selectbox(
 base_row = df.iloc[row_selector:row_selector+1].copy()
 
 # ============================================================
-# ✏️ Controles What-If con reinicio de valores
+# ✏️ Controles What-If
 # ============================================================
 if "selected_row" not in st.session_state or st.session_state["selected_row"] != row_selector:
     st.session_state["selected_row"] = row_selector
@@ -220,7 +225,7 @@ with col2:
     st.subheader("🏷️ Categóricas / Otros")
     for c in cat_cols:
         uniques = df[c].dropna().unique().tolist()
-        default = base_row.iloc[0][c] if c in base_row.columns else (uniques[0] if uniques else "")
+        default = base_row.iloc[0][c]
         default_val = st.session_state["mod_values"].get(c, default)
         if len(uniques) <= 20 and len(uniques) > 0:
             new_val = st.selectbox(c, options=uniques, index=uniques.index(default_val) if default_val in uniques else 0)
@@ -230,7 +235,7 @@ with col2:
         st.session_state["mod_values"][c] = new_val
 
 # ============================================================
-# 🧾 Tabla comparativa con resaltado de cambios (sin 'campaign')
+# 🧾 Comparativa
 # ============================================================
 comparacion = pd.DataFrame({
     "Variable": base_row.columns,
@@ -251,102 +256,85 @@ def highlight_changes(row):
         if orig!=mod: return ["","background-color: #FFF2CC",""]
     return [""]*3
 
-st.markdown("### <span style='background-color:#343a40; padding:5px; border-radius:5px;'>🧾 Comparativa de valores del cliente</span>", unsafe_allow_html=True)
+st.markdown("### 🧾 Comparativa de valores del cliente")
 st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_width=True)
 
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-try:
-    cleaner = modelo_pipeline.named_steps["cleaner"]
-    preprocessor = modelo_pipeline.named_steps["preprocessor"]
-    model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
-except KeyError:
-    st.error("❌ El pipeline no contiene 'cleaner' o 'preprocessor'. Revisa los nombres de pasos.")
-    st.stop()
+cleaner = modelo_pipeline.named_steps["cleaner"]
+preprocessor = modelo_pipeline.named_steps["preprocessor"]
+model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
-
 base_row_preprocessed = preprocessor.transform(base_row_clean)
 new_row_preprocessed = preprocessor.transform(new_row_clean)
-
-X_before = base_row_preprocessed if isinstance(base_row_preprocessed, np.ndarray) else base_row_preprocessed.values
-X_after = new_row_preprocessed if isinstance(new_row_preprocessed, np.ndarray) else new_row_preprocessed.values
-
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
-background_array = background_preprocessed if isinstance(background_preprocessed, np.ndarray) else background_preprocessed.values
+
+X_before = np.array(base_row_preprocessed)
+X_after = np.array(new_row_preprocessed)
+background_array = np.array(background_preprocessed)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
-try:
-    feat_names = preprocessor.get_feature_names_out()
-except Exception:
-    feat_names = [f"f{i}" for i in range(X_before.shape[1])]
+feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-exp_before = shap.Explanation(values=shap_values_before.values[0],
-                              base_values=explainer.expected_value,
-                              data=X_before[0],
-                              feature_names=feat_names)
-exp_after = shap.Explanation(values=shap_values_after.values[0],
-                             base_values=explainer.expected_value,
-                             data=X_after[0],
-                             feature_names=feat_names)
+exp_before = shap.Explanation(
+    values=shap_values_before.values[0],
+    base_values=np.mean(shap_values_before.base_values),
+    data=pd.Series(X_before[0], index=feat_names),
+    feature_names=feat_names
+)
+exp_after = shap.Explanation(
+    values=shap_values_after.values[0],
+    base_values=np.mean(shap_values_after.base_values),
+    data=pd.Series(X_after[0], index=feat_names),
+    feature_names=feat_names
+)
 
 prob_before = expit(exp_before.base_values + exp_before.values.sum())
 prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
 # ============================================================
-# 📊 Probabilidades en cuadros
+# 📊 Probabilidades
 # ============================================================
-st.markdown("### <span style='background-color:#343a40; padding:5px; border-radius:5px;'>📊 Probabilidades</span>", unsafe_allow_html=True)
+st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
 colA.markdown(f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad original<br>{prob_before:.4f}</div>", unsafe_allow_html=True)
 colB.markdown(f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad modificada<br>{prob_after:.4f}</div>", unsafe_allow_html=True)
 
 # ============================================================
-# 💧 Comparación de Waterfalls
+# 💧 Waterfalls con nombres de variables
 # ============================================================
-st.markdown("### <span style='background-color:#343a40; padding:5px; border-radius:5px;'>💧 Waterfall SHAP</span>", unsafe_allow_html=True)
+st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(exp_before, max_display=10, show=False)
+    plt.title("SHAP antes de modificaciones", color="white")
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(exp_after, max_display=10, show=False)
+    plt.title("SHAP después de modificaciones", color="white")
     st.pyplot(fig2)
 
-st.caption("Ambos gráficos muestran las contribuciones SHAP en log-odds. Las métricas superiores muestran las probabilidades transformadas con sigmoide.")
-
 # ============================================================
-# 🖨️ Descargar PPTX con resultados
+# 🖨️ PPTX con gráficas idénticas
 # ============================================================
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
-import io
-from pptx.enum.text import MSO_ANCHOR
-
-
 def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_before, fig_after):
     prs = Presentation()
-    
-    # Definir tamaño de diapositiva
     SLIDE_WIDTH = prs.slide_width
     SLIDE_HEIGHT = prs.slide_height
-
-    # Colores
-    bg_color = RGBColor(30, 30, 30)
     text_color = RGBColor(255, 255, 255)
     title_bg = RGBColor(70, 70, 70)
     prob_bg_before = RGBColor(0, 102, 204)
@@ -354,103 +342,67 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     table_fill = RGBColor(60, 60, 60)
 
     def add_title_box(slide, text, top):
-        width = SLIDE_WIDTH - Inches(1.0)
-        left = Inches(0.5)
-        height = Inches(0.6)
-        box = slide.shapes.add_textbox(left, top, width, height)
-        box.fill.solid()
-        box.fill.fore_color.rgb = title_bg
-        tf = box.text_frame
-        tf.text = text
-        tf.paragraphs[0].font.size = Pt(14)
-        tf.paragraphs[0].font.bold = True
-        tf.paragraphs[0].font.color.rgb = text_color
-        tf.paragraphs[0].alignment = 1  # centrado
-        return box
+        box = slide.shapes.add_textbox(Inches(0.5), top, SLIDE_WIDTH - Inches(1), Inches(0.6))
+        box.fill.solid(); box.fill.fore_color.rgb = title_bg
+        tf = box.text_frame; tf.text = text
+        tf.paragraphs[0].font.size = Pt(14); tf.paragraphs[0].font.bold = True
+        tf.paragraphs[0].font.color.rgb = text_color; tf.paragraphs[0].alignment = 1
 
     def add_prob_box(slide, left, top, width, height, text, bg):
         box = slide.shapes.add_textbox(left, top, width, height)
-        box.fill.solid()
-        box.fill.fore_color.rgb = bg
-        tf = box.text_frame
-        tf.text = text
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        box.fill.solid(); box.fill.fore_color.rgb = bg
+        tf = box.text_frame; tf.text = text; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
         for p in tf.paragraphs:
-            p.font.size = Pt(13)
-            p.font.color.rgb = RGBColor(255, 255, 255)
-            p.alignment = 1
-        return box
+            p.font.size = Pt(13); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = 1
 
-    def add_table_from_df(slide, df, top, total_width, left_margin_ratio=0.05, height=Inches(4.5)):
+    def add_table(slide, df, top):
         n_rows, n_cols = df.shape
-        left = int((SLIDE_WIDTH * left_margin_ratio))
-        width = int(SLIDE_WIDTH * (1 - 2*left_margin_ratio))
         table = slide.shapes.add_table(rows=n_rows+1, cols=n_cols,
-                                       left=left, top=int(top.emu),
-                                       width=width, height=int(height.emu)).table
-        
+                                       left=Inches(0.5), top=top,
+                                       width=SLIDE_WIDTH - Inches(1),
+                                       height=Inches(4.5)).table
         for j, col_name in enumerate(df.columns):
-            cell = table.cell(0, j)
-            cell.text = str(col_name)
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = table_fill
-            cell.text_frame.paragraphs[0].font.size = Pt(12)
+            cell = table.cell(0, j); cell.text = str(col_name)
+            cell.fill.solid(); cell.fill.fore_color.rgb = table_fill
             cell.text_frame.paragraphs[0].font.bold = True
             cell.text_frame.paragraphs[0].font.color.rgb = text_color
-            cell.text_frame.paragraphs[0].alignment = 1
-        
         for i in range(n_rows):
             for j in range(n_cols):
                 cell = table.cell(i+1, j)
                 cell.text = str(df.iloc[i, j])
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = table_fill
-                cell.text_frame.paragraphs[0].font.size = Pt(12)
+                cell.fill.solid(); cell.fill.fore_color.rgb = table_fill
                 cell.text_frame.paragraphs[0].font.color.rgb = text_color
-                cell.text_frame.paragraphs[0].alignment = 1
-
-        col_width = int(width / n_cols)
-        for j in range(n_cols):
-            table.columns[j].width = col_width
-        return table
 
     def add_existing_figure_slide(prs, fig, title_text):
-        """Usa directamente la figura matplotlib ya creada (con nombres de variables intactos)."""
         slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_title_box(slide, title_text, top=Inches(0.3))
-        img_stream = io.BytesIO()
-        # Guardamos el mismo gráfico que se muestra en Streamlit
-        fig.savefig(img_stream, bbox_inches='tight', dpi=150)
+        add_title_box(slide, title_text, Inches(0.3))
+        img_stream = BytesIO(); fig.savefig(img_stream, bbox_inches='tight', dpi=150)
         img_stream.seek(0)
         slide.shapes.add_picture(img_stream, Inches(0.5), Inches(1.0),
-                                 width=SLIDE_WIDTH - Inches(1.0),
+                                 width=SLIDE_WIDTH - Inches(1),
                                  height=SLIDE_HEIGHT - Inches(1.5))
-        return slide
 
-    # --- Slide 1: Probabilidades + tabla ---
+    # Slide 1: Probabilidades + tabla
     slide1 = prs.slides.add_slide(prs.slide_layouts[6])
-    add_title_box(slide1, "Resultados de la simulación", top=Inches(0.3))
+    add_title_box(slide1, "Resultados de la simulación", Inches(0.3))
     margin = Inches(0.5)
-    box_width = (SLIDE_WIDTH - 3*margin)/2
-    box_height = Inches(0.8)
-    add_prob_box(slide1, margin, Inches(1.0), box_width, box_height,
+    bw = (SLIDE_WIDTH - 3*margin)/2
+    add_prob_box(slide1, margin, Inches(1), bw, Inches(0.8),
                  f"Probabilidad original: {prob_before:.4f}", prob_bg_before)
-    add_prob_box(slide1, 2*margin + box_width, Inches(1.0), box_width, box_height,
+    add_prob_box(slide1, 2*margin + bw, Inches(1), bw, Inches(0.8),
                  f"Probabilidad modificada: {prob_after:.4f}", prob_bg_after)
-    add_table_from_df(slide1, comparacion_df, top=Inches(2.0), total_width=SLIDE_WIDTH)
+    add_table(slide1, comparacion_df, Inches(2))
 
-    # --- Slide 2: SHAP antes ---
+    # Slide 2 y 3 con figuras reales
     add_existing_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
-
-    # --- Slide 3: SHAP después ---
     add_existing_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
 
-    # Guardar
-    pptx_stream = io.BytesIO()
+    pptx_stream = BytesIO()
     prs.save(pptx_stream)
     pptx_stream.seek(0)
     return pptx_stream
 
 pptx_stream = create_pptx_dark_centered(prob_before, prob_after, comparacion, fig1, fig2)
 st.download_button("📥 Descargar resultados en PPTX", pptx_stream,
-                   file_name="simulacion_resultados.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+                   file_name="simulacion_resultados.pptx",
+                   mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
