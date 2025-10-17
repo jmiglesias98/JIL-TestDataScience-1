@@ -265,10 +265,10 @@ def highlight_changes(row):
     if pd.isna(orig) or pd.isna(mod):
         return [""]*3
     if isinstance(orig, (int,float)) and isinstance(mod, (int,float)):
-        if mod>orig: return ["","background-color: #C6EFCE",""]
-        elif mod<orig: return ["","background-color: #FFC7CE",""]
+        if mod>orig: return ["","background-color: #006666",""]
+        elif mod<orig: return ["","background-color: #006666",""]
     else:
-        if orig!=mod: return ["","background-color: #FFF2CC",""]
+        if orig!=mod: return ["","background-color: #006666",""]
     return [""]*3
 
 st.markdown("### 🧾 Comparativa de valores del cliente")
