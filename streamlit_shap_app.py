@@ -257,13 +257,20 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 base_value = explainer.expected_value
 st.write(f"Base value: {base_value}")
 
-# 5️⃣ Mostrar gráfico Waterfall
+# ============================================================
+# 5️⃣ Mostrar gráfico Waterfall — convertido a PROBABILIDADES
+# ============================================================
+from scipy.special import expit  # sigmoide para pasar de log-odds → probas
+
 vals = shap_values.values[0]
+
+# --- 1️⃣ Nombres de features
 try:
-    feat_names = preprocessor.ct.get_feature_names_out().tolist()
+    feat_names = preprocessor.get_feature_names_out().tolist()
 except Exception:
     feat_names = [f"f{i}" for i in range(len(vals))]
 
+# --- 2️⃣ Ordenar por impacto
 order = np.argsort(np.abs(vals))[::-1]
 top_k = st.sidebar.slider(
     "Número de features a mostrar (top K por impacto)",
@@ -271,22 +278,49 @@ top_k = st.sidebar.slider(
     max_value=min(50, len(feat_names)),
     value=min(10, len(feat_names))
 )
-
 ordered_feats = [feat_names[i] for i in order[:top_k]]
 ordered_vals = [vals[i] for i in order[:top_k]]
 
-x = ["Base value"] + ordered_feats + ["Prediction"]
-measures = ["absolute"] + ["relative"] * len(ordered_vals) + ["total"]
-y = [base_value] + ordered_vals + [None]
+# --- 3️⃣ Convertir log-odds → probabilidades paso a paso
+base_logit = explainer.expected_value
+base_proba = expit(base_logit)
+
+# Probabilidades acumuladas a medida que se suman los SHAPs
+prob_steps = [base_proba]
+logit_current = base_logit
+for v in ordered_vals:
+    logit_current += v
+    prob_steps.append(expit(logit_current))
+
+# Cambios relativos de probabilidad en cada paso
+prob_deltas = np.diff(prob_steps)
+pred_final_proba = prob_steps[-1]
+
+# --- 4️⃣ Construir el gráfico Waterfall en espacio de probas
+x_labels = ["Base prob"] + ordered_feats + ["Predicción"]
+measures = ["absolute"] + ["relative"] * len(prob_deltas) + ["total"]
+y_values = [base_proba] + prob_deltas.tolist() + [None]
 
 fig = go.Figure(go.Waterfall(
-    name="SHAP Waterfall",
+    name="SHAP (espacio de probabilidad)",
     orientation="v",
     measure=measures,
-    x=x,
-    y=y,
+    x=x_labels,
+    y=y_values,
     textposition="outside",
     connector={"line": {"color": "rgb(63, 63, 63)"}}
 ))
-fig.update_layout(title_text=f"Waterfall de contribuciones SHAP (top {top_k})", waterfallgroupgap=0.5)
+fig.update_layout(
+    title_text=f"Waterfall SHAP (Top {top_k}) — espacio de probabilidad",
+    waterfallgroupgap=0.5,
+    yaxis_title="Probabilidad",
+)
 st.plotly_chart(fig, use_container_width=True)
+
+# --- 5️⃣ Mostrar comparaciones
+from math import isclose
+st.metric("Probabilidad modelo", f"{y_pred_proba:.4f}")
+st.metric("Probabilidad desde SHAP", f"{pred_final_proba:.4f}")
+if not isclose(y_pred_proba, pred_final_proba, rel_tol=1e-2):
+    st.warning("⚠️ Las probabilidades difieren ligeramente por redondeo numérico.")
+st.caption("Los valores SHAP se han convertido de log-odds a probabilidades usando la función sigmoide.")
