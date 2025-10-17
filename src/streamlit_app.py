@@ -52,8 +52,8 @@ st.title("Simulador de contratación de depósitos")
 # ============================================================
 # 🌐 URLs
 # ============================================================
-CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/clientes_20251016.csv"
-MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/DataScience/refs/heads/main/mejor_modelo_20251016.joblib"
+CSV_URL = "https://raw.githubusercontent.com/jmiglesias98/JIL-TestDataScience-1/refs/heads/main/data/clientes_20251016.csv"
+MODEL_URL = "https://raw.githubusercontent.com/jmiglesias98/JIL-TestDataScience-1/refs/heads/main/models/mejor_modelo_20251016.joblib"
 
 # ============================================================
 # 🧹 Clases personalizadas
