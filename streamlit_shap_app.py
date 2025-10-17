@@ -354,7 +354,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     table_fill = RGBColor(60, 60, 60)
 
     def add_title_box(slide, text, top):
-        width = SLIDE_WIDTH - Inches(1.0)  # 0.5" margen izquierda/derecha
+        width = SLIDE_WIDTH - Inches(1.0)
         left = Inches(0.5)
         height = Inches(0.6)
         box = slide.shapes.add_textbox(left, top, width, height)
@@ -362,7 +362,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         box.fill.fore_color.rgb = title_bg
         tf = box.text_frame
         tf.text = text
-        tf.paragraphs[0].font.size = Pt(12)
+        tf.paragraphs[0].font.size = Pt(14)
         tf.paragraphs[0].font.bold = True
         tf.paragraphs[0].font.color.rgb = text_color
         tf.paragraphs[0].alignment = 1  # centrado
@@ -375,11 +375,10 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
         tf = box.text_frame
         tf.text = text
         tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        tf.margin_bottom = tf.margin_top = tf.margin_left = tf.margin_right = 0
         for p in tf.paragraphs:
-            p.font.size = Pt(12)
+            p.font.size = Pt(13)
             p.font.color.rgb = RGBColor(255, 255, 255)
-            p.alignment = 1  # centrado horizontal
+            p.alignment = 1
         return box
 
     def add_table_from_df(slide, df, top, total_width, left_margin_ratio=0.05, height=Inches(4.5)):
@@ -390,7 +389,6 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
                                        left=left, top=int(top.emu),
                                        width=width, height=int(height.emu)).table
         
-        # Cabeceras
         for j, col_name in enumerate(df.columns):
             cell = table.cell(0, j)
             cell.text = str(col_name)
@@ -399,9 +397,8 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
             cell.text_frame.paragraphs[0].font.size = Pt(12)
             cell.text_frame.paragraphs[0].font.bold = True
             cell.text_frame.paragraphs[0].font.color.rgb = text_color
-            cell.text_frame.paragraphs[0].alignment = 1  # centrado
+            cell.text_frame.paragraphs[0].alignment = 1
         
-        # Datos
         for i in range(n_rows):
             for j in range(n_cols):
                 cell = table.cell(i+1, j)
@@ -410,24 +407,24 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
                 cell.fill.fore_color.rgb = table_fill
                 cell.text_frame.paragraphs[0].font.size = Pt(12)
                 cell.text_frame.paragraphs[0].font.color.rgb = text_color
-                cell.text_frame.paragraphs[0].alignment = 1  # centrado
+                cell.text_frame.paragraphs[0].alignment = 1
 
-        # Ajustar anchos de columnas
         col_width = int(width / n_cols)
         for j in range(n_cols):
             table.columns[j].width = col_width
-
         return table
 
-    def add_figure_slide(prs, fig, title_text):
+    def add_existing_figure_slide(prs, fig, title_text):
+        """Usa directamente la figura matplotlib ya creada (con nombres de variables intactos)."""
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         add_title_box(slide, title_text, top=Inches(0.3))
         img_stream = io.BytesIO()
-        fig.savefig(img_stream, bbox_inches='tight', facecolor='black')
+        # Guardamos el mismo gráfico que se muestra en Streamlit
+        fig.savefig(img_stream, bbox_inches='tight', dpi=150)
         img_stream.seek(0)
         slide.shapes.add_picture(img_stream, Inches(0.5), Inches(1.0),
-                                 width=SLIDE_WIDTH-Inches(1.0),
-                                 height=SLIDE_HEIGHT-Inches(1.5))
+                                 width=SLIDE_WIDTH - Inches(1.0),
+                                 height=SLIDE_HEIGHT - Inches(1.5))
         return slide
 
     # --- Slide 1: Probabilidades + tabla ---
@@ -440,15 +437,15 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
                  f"Probabilidad original: {prob_before:.4f}", prob_bg_before)
     add_prob_box(slide1, 2*margin + box_width, Inches(1.0), box_width, box_height,
                  f"Probabilidad modificada: {prob_after:.4f}", prob_bg_after)
-    add_table_from_df(slide1, comparacion_df, top=Inches(2.0), total_width=SLIDE_WIDTH, left_margin_ratio=0.05)
+    add_table_from_df(slide1, comparacion_df, top=Inches(2.0), total_width=SLIDE_WIDTH)
 
     # --- Slide 2: SHAP antes ---
-    add_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
+    add_existing_figure_slide(prs, fig_before, "Valores SHAP antes de modificaciones")
 
     # --- Slide 3: SHAP después ---
-    add_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
+    add_existing_figure_slide(prs, fig_after, "Valores SHAP después de modificaciones")
 
-    # Guardar en BytesIO
+    # Guardar
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     pptx_stream.seek(0)
