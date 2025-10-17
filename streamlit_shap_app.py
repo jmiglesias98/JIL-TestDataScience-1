@@ -446,7 +446,7 @@ def create_pptx_dark_improved(prob_before, prob_after, comparacion_df,
 # y las variables: prob_before, prob_after, comparacion_df, fig_before, fig_after
 
 pptx_data = create_pptx_dark_improved(
-    prob_before, prob_after, comparacion_df,
+    prob_before, prob_after, comparacion,
     fig_before, fig_after
 )
 
