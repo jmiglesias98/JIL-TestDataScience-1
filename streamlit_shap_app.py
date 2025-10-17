@@ -240,18 +240,29 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 # ============================================================
 st.write(f"💧 Mostrando explicabilidad individual para cliente índice **{row_selector}**")
 
+# Intentamos recuperar nombres de features de forma segura
+try:
+    feat_names = preprocessor.get_feature_names_out()
+except Exception:
+    try:
+        feat_names = preprocessor.ct.get_feature_names_out()
+    except Exception:
+        feat_names = [f"f{i}" for i in range(X_input_array.shape[1])]
+
+# Crear explicación SHAP
 exp = shap.Explanation(
     values=shap_values.values[0],
     base_values=explainer.expected_value,
     data=X_input_array[0],
-    feature_names=preprocessor.get_feature_names_out()
+    feature_names=feat_names
 )
 
+# Mostrar gráfico Waterfall
 fig, ax = plt.subplots(figsize=(10, 6))
 shap.plots.waterfall(exp, max_display=10, show=False)
 st.pyplot(fig)
 
-# Mostrar probabilidad convertida desde log-odds
+# Mostrar probabilidad final (logit → sigmoide)
 logit_total = exp.base_values + exp.values.sum()
 prob_pred = expit(logit_total)
 st.metric("Probabilidad predicha (sigmoide)", f"{prob_pred:.4f}")
