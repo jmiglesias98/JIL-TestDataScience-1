@@ -415,8 +415,8 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
 
         table = slide.shapes.add_table(
             rows=n_rows + 1, cols=n_cols,
-            left=left, top=int(top.emu),
-            width=width, height=int(height.emu)
+            left=left, top=top,
+            width=width, height=height
         ).table
 
         # Ajustar tamaño de fuente según número de filas
