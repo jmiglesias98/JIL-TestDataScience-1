@@ -8,13 +8,17 @@ import joblib
 from io import BytesIO
 import requests
 import shap
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from scipy.special import expit
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
+# ============================================================
+# ⚙️ Configuración de la app
+# ============================================================
 st.set_page_config(layout="wide", page_title="What-if SHAP Explorer")
 st.title("What-if SHAP Explorer — App Streamlit")
 st.markdown("Los datos y el modelo se cargan directamente desde URLs predefinidas en GitHub.")
@@ -64,7 +68,7 @@ class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
     def __init__(self, cols_to_drop_after_ohe=None):
         self.cols_to_drop_after_ohe = cols_to_drop_after_ohe
         self.ct = None
-        self.feature_names_out_ = None  # 👈 para guardar los nombres finales
+        self.feature_names_out_ = None
 
     def fit(self, X, y=None):
         num_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
@@ -86,32 +90,23 @@ class PreprocesadorDinamico(BaseEstimator, TransformerMixin):
         ])
 
         self.ct.fit(X)
-
-        # Guardamos nombres de características originales del ColumnTransformer
         self.feature_names_out_ = self.ct.get_feature_names_out()
 
-        # Si hay columnas a eliminar, las quitamos de la lista
         if self.cols_to_drop_after_ohe:
             self.feature_names_out_ = [
-                c for c in self.feature_names_out_
-                if c not in self.cols_to_drop_after_ohe
+                c for c in self.feature_names_out_ if c not in self.cols_to_drop_after_ohe
             ]
-
         return self
 
     def transform(self, X):
         X_t = self.ct.transform(X)
         df = pd.DataFrame(X_t, columns=self.ct.get_feature_names_out())
-
-        # Eliminar columnas después del OHE si existen
         if self.cols_to_drop_after_ohe:
             cols_existentes = [c for c in self.cols_to_drop_after_ohe if c in df.columns]
             df = df.drop(columns=cols_existentes, errors="ignore")
-
-        return df.values  # o df si prefieres mantener nombres de columnas
+        return df.values
 
     def get_feature_names_out(self):
-        """Permite acceder a los nombres de las variables finales."""
         return self.feature_names_out_
 
 
@@ -154,7 +149,7 @@ except Exception as e:
 features = df.columns.tolist()
 
 # ============================================================
-# 🛠️ Configuración de la app
+# 🛠️ Controles de configuración
 # ============================================================
 st.sidebar.header("⚙️ Configuración")
 
@@ -210,13 +205,8 @@ st.write("### 🧮 Valores modificados")
 st.write(new_row.T)
 
 # ============================================================
-# 🧩 Predicción y SHAP — VERSIÓN FINAL USANDO PIPELINE COMPLETO
+# 🧩 Predicción y SHAP — versión nativa con waterfall
 # ============================================================
-# ============================================================
-# 🧩 Predicción y SHAP — CORREGIDO Y ESTABLE
-# ============================================================
-
-# 1️⃣ Limpiar y transformar la fila igual que en entrenamiento
 try:
     cleaner = modelo_pipeline.named_steps["cleaner"]
     preprocessor = modelo_pipeline.named_steps["preprocessor"]
@@ -225,102 +215,44 @@ except KeyError:
     st.error("❌ El pipeline no contiene 'cleaner' o 'preprocessor'. Revisa los nombres de pasos.")
     st.stop()
 
-# Aplicar los mismos pasos que en el entrenamiento
+# Aplicar pasos de preprocesamiento
 new_row_clean = cleaner.transform(new_row)
 new_row_preprocessed = preprocessor.transform(new_row_clean)
+X_input_array = new_row_preprocessed.values if hasattr(new_row_preprocessed, "values") else new_row_preprocessed
 
-# Si devuelve un DataFrame con .values
-if hasattr(new_row_preprocessed, "values"):
-    X_input_array = new_row_preprocessed.values
-else:
-    X_input_array = new_row_preprocessed
+# Predicción
+y_pred_proba = model.predict_proba(X_input_array)[0, 1]
+st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
 
-# 2️⃣ Calcular la predicción
-try:
-    y_pred_proba = model.predict_proba(X_input_array)[0, 1]
-    st.metric("Predicción (modelo)", value=str(round(y_pred_proba, 4)))
-except Exception as e:
-    st.error(f"❌ Error al predecir con el modelo: {e}")
-    st.stop()
-
-# 3️⃣ Crear background correctamente preprocesado
-background_raw = df.sample(min(100, len(df)), random_state=42)
+# Crear background para SHAP
+background_raw = df.sample(min(bg_size, len(df)), random_state=42)
 background_clean = cleaner.transform(background_raw)
 background_preprocessed = preprocessor.transform(background_clean)
 background_array = background_preprocessed.values if hasattr(background_preprocessed, "values") else background_preprocessed
 
-# 4️⃣ Crear explainer en el espacio del modelo
+# Explicación SHAP individual
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
     shap_values = explainer(X_input_array)
 
-base_value = explainer.expected_value
-st.write(f"Base value: {base_value}")
-
 # ============================================================
-# 5️⃣ Mostrar gráfico Waterfall — convertido a PROBABILIDADES
+# 💧 Waterfall SHAP (versión nativa)
 # ============================================================
-from scipy.special import expit  # sigmoide para pasar de log-odds → probas
+st.write(f"💧 Mostrando explicabilidad individual para cliente índice **{row_selector}**")
 
-vals = shap_values.values[0]
-
-# --- 1️⃣ Nombres de features
-try:
-    feat_names = preprocessor.get_feature_names_out().tolist()
-except Exception:
-    feat_names = [f"f{i}" for i in range(len(vals))]
-
-# --- 2️⃣ Ordenar por impacto
-order = np.argsort(np.abs(vals))[::-1]
-top_k = st.sidebar.slider(
-    "Número de features a mostrar (top K por impacto)",
-    min_value=3,
-    max_value=min(50, len(feat_names)),
-    value=min(10, len(feat_names))
+exp = shap.Explanation(
+    values=shap_values.values[0],
+    base_values=explainer.expected_value,
+    data=X_input_array[0],
+    feature_names=preprocessor.get_feature_names_out()
 )
-ordered_feats = [feat_names[i] for i in order[:top_k]]
-ordered_vals = [vals[i] for i in order[:top_k]]
 
-# --- 3️⃣ Convertir log-odds → probabilidades paso a paso
-base_logit = explainer.expected_value
-base_proba = expit(base_logit)
+fig, ax = plt.subplots(figsize=(10, 6))
+shap.plots.waterfall(exp, max_display=10, show=False)
+st.pyplot(fig)
 
-# Probabilidades acumuladas a medida que se suman los SHAPs
-prob_steps = [base_proba]
-logit_current = base_logit
-for v in ordered_vals:
-    logit_current += v
-    prob_steps.append(expit(logit_current))
-
-# Cambios relativos de probabilidad en cada paso
-prob_deltas = np.diff(prob_steps)
-pred_final_proba = prob_steps[-1]
-
-# --- 4️⃣ Construir el gráfico Waterfall en espacio de probas
-x_labels = ["Base prob"] + ordered_feats + ["Predicción"]
-measures = ["absolute"] + ["relative"] * len(prob_deltas) + ["total"]
-y_values = [base_proba] + prob_deltas.tolist() + [None]
-
-fig = go.Figure(go.Waterfall(
-    name="SHAP (espacio de probabilidad)",
-    orientation="v",
-    measure=measures,
-    x=x_labels,
-    y=y_values,
-    textposition="outside",
-    connector={"line": {"color": "rgb(63, 63, 63)"}}
-))
-fig.update_layout(
-    title_text=f"Waterfall SHAP (Top {top_k}) — espacio de probabilidad",
-    waterfallgroupgap=0.5,
-    yaxis_title="Probabilidad",
-)
-st.plotly_chart(fig, use_container_width=True)
-
-# --- 5️⃣ Mostrar comparaciones
-from math import isclose
-st.metric("Probabilidad modelo", f"{y_pred_proba:.4f}")
-st.metric("Probabilidad desde SHAP", f"{pred_final_proba:.4f}")
-if not isclose(y_pred_proba, pred_final_proba, rel_tol=1e-2):
-    st.warning("⚠️ Las probabilidades difieren ligeramente por redondeo numérico.")
-st.caption("Los valores SHAP se han convertido de log-odds a probabilidades usando la función sigmoide.")
+# Mostrar probabilidad convertida desde log-odds
+logit_total = exp.base_values + exp.values.sum()
+prob_pred = expit(logit_total)
+st.metric("Probabilidad predicha (sigmoide)", f"{prob_pred:.4f}")
+st.caption("El gráfico SHAP está en el espacio log-odds (logit), pero arriba se muestra la probabilidad final equivalente.")
