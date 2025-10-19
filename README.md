@@ -1,6 +1,6 @@
 # JIL-TestDataScience-1
 
-Este repositorio contiene un proyecto de ciencia de datos centrado en evaluar la efectividad de una campaña de marketing de un banco portugués. El objetivo principal es analizar cómo las acciones de la campaña afectan la decisión de los clientes contactados para contratar un depósito, y proporcionar herramientas predictivas y analíticas que puedan apoyar la planificación de futuras campañas.
+Este repositorio contiene un proyecto de ciencia de datos centrado en evaluar la efectividad de una campaña de marketing de un banco portugués (Dataset: https://www.kaggle.com/datasets/janiobachmann/bank-marketing-dataset). El objetivo principal es analizar cómo las acciones de la campaña afectan la decisión de los clientes contactados para contratar un depósito, y proporcionar herramientas predictivas y analíticas que puedan apoyar la planificación de futuras campañas.
 
 Entre las herramientas desarrolladas se incluyen:
 
