@@ -296,15 +296,10 @@ background_array = np.array(background_preprocessed)
 # 🧩 Predicción, SHAP y Waterfall
 # ============================================================
 
-import shap
-from scipy.special import expit
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# -------------------------------------------------------------------
+# ============================================================
+# 🧩 Predicción, SHAP y Waterfall (robusto)
+# ============================================================
 # 1️⃣ Preparar datos
-# -------------------------------------------------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
@@ -324,17 +319,13 @@ background_array = np.array(background_preprocessed)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-# -------------------------------------------------------------------
 # 2️⃣ Crear explainer (KernelExplainer compatible con cualquier XGBoost)
-# -------------------------------------------------------------------
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.KernelExplainer(model.predict_proba, background_array)
     shap_values_before = explainer.shap_values(X_before)
     shap_values_after = explainer.shap_values(X_after)
 
-# -------------------------------------------------------------------
-# 3️⃣ Función helper para convertir shap_values en Explanation 1D
-# -------------------------------------------------------------------
+# 3️⃣ Función helper para crear Explanation 1D compatible con waterfall
 def make_explanation(shap_values, X_row, feature_names):
     """
     Convierte cualquier shap_values en shap.Explanation 1D para waterfall.
@@ -342,13 +333,13 @@ def make_explanation(shap_values, X_row, feature_names):
       - array 2D (n_samples × n_features)
       - lista de arrays por clase
     """
-    # Si es lista de arrays (por clase)
     if isinstance(shap_values, list):
-        vals = shap_values[-1][0]  # última clase, primera fila
+        # Tomar última clase (positiva) y primera fila
+        vals = shap_values[-1][0]
         base = 0.5
     else:
-        # shap_values es array 2D
-        vals = shap_values[0]  # primera fila
+        # Array 2D
+        vals = shap_values[0]
         base = 0.5
 
     return shap.Explanation(
@@ -358,9 +349,11 @@ def make_explanation(shap_values, X_row, feature_names):
         feature_names=feature_names
     )
 
-# -------------------------------------------------------------------
+# Crear explicaciones para waterfall
+exp_before = make_explanation(shap_values_before, X_before, feat_names)
+exp_after = make_explanation(shap_values_after, X_after, feat_names)
+
 # 4️⃣ Calcular probabilidades
-# -------------------------------------------------------------------
 prob_before = float(model.predict_proba(X_before)[0,1])
 prob_after = float(model.predict_proba(X_after)[0,1])
 
@@ -378,9 +371,7 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-# -------------------------------------------------------------------
 # 5️⃣ Waterfall SHAP
-# -------------------------------------------------------------------
 st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
 
@@ -395,6 +386,7 @@ with col2:
     fig2, ax2 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(exp_after, max_display=10, show=False)
     st.pyplot(fig2)
+
 
 
 # ============================================================
