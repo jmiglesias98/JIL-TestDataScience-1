@@ -288,20 +288,17 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
 
-X_before = np.array(base_row_preprocessed)
-X_after = np.array(new_row_preprocessed)
-background_array = np.array(background_preprocessed)
+X_before = pd.DataFrame([base_row])  # 1 fila
+X_after = pd.DataFrame([new_row])
+background = pd.DataFrame(background)
 
-def pipeline_predict(X):
-    return modelo_pipeline.predict_proba(X)[:, 1]
-    
+feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
+
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(pipeline_predict, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
-
-feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
-
+    
 exp_before = shap.Explanation(
     values=shap_values_before.values[0],
     base_values=np.mean(shap_values_before.base_values),
@@ -318,6 +315,9 @@ exp_after = shap.Explanation(
 prob_before = expit(exp_before.base_values + exp_before.values.sum())
 prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
+def pipeline_predict(X):
+    return modelo_pipeline.predict_proba(X)[:, 1]
+    
 # ============================================================
 # 📊 Probabilidades
 # ============================================================
@@ -330,6 +330,7 @@ colB.markdown(f"<div style='background-color:#ff7f0e; padding:10px; border-radiu
 # 💧 Waterfalls con nombres de variables
 # ============================================================
 st.markdown("### 💧 Waterfall SHAP")
+
 col1, col2 = st.columns(2)
 
 with col1:
