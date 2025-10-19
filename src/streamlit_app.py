@@ -319,9 +319,9 @@ colB.markdown(
 # 2️⃣ Crear SHAP TreeExplainer
 # ----------------------------
 # Calcula las explicaciones SHAP
-explainer = shap.Explainer(xgb_model, background_array)
-shap_values_before = explainer(X_before)
-shap_values_after = explainer(X_after)
+explainer = shap.TreeExplainer(xgb_model)
+shap_values_before = explainer.shap_values(X_before)
+shap_values_after = explainer.shap_values(X_after)
 
 # 👉 Si es clasificación binaria, toma solo la clase positiva (índice 1)
 # Algunas versiones devuelven lista, otras devuelven un objeto con 3 dimensiones
