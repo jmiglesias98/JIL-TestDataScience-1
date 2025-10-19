@@ -312,9 +312,10 @@ exp_after = shap.Explanation(
     feature_names=feat_names
 )
 
-prob_before = expit(exp_before.base_values + exp_before.values.sum())
-prob_after = expit(exp_after.base_values + exp_after.values.sum())
-
+#prob_before = expit(exp_before.base_values + exp_before.values.sum())
+#prob_after = expit(exp_after.base_values + exp_after.values.sum())
+prob_before = exp_before.base_values + exp_before.values.sum()
+prob_after = exp_after.base_values + exp_after.values.sum()
 # ============================================================
 # 📊 Probabilidades
 # ============================================================
