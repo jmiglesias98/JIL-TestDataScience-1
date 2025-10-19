@@ -26,21 +26,19 @@ El proyecto combina análisis exploratorio de datos, construcción y evaluación
 
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
-| `01_classification_analysis_test_1.ipynb`  | Notebook que contiene el desarrollo del caso práctico y la argumentación del mismo. |
-| `01_classification_analysis_test_1.html`   | Notebook renderizado. |
+| `01_classification_analysis_test_1.ipynb`    | Notebook que contiene el desarrollo del caso práctico y la argumentación del mismo. |
+| `01_classification_analysis_test_1.html`     | Notebook renderizado. |
 
 ## Modelos
 
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
-
 | `mejor_modelo_20251016.joblib` | Modelo ganador - XGBoost con AUC-ROC del 93%. |
 
 ## Datos
 
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
-
 | `bank-full.csv` | Fichero sin tratar descargado de kaggle que sirve como starting point de este caso práctico. |
 | `clientes_20251016.csv` | Fichero equivalente al anterior con la diferencia de que no presenta la variable objetivo.  |
 | `clientes_20251016_predicciones.csv` | Salida obtenida de la ejecución del modelo productivizado. |
