@@ -328,32 +328,31 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-background_df = background.copy()
-X_before_df  = base_row.copy()
-X_after_df   = new_row.copy()
+# ----------------------------
+# 4️⃣ Crear SHAP TreeExplainer
+# ----------------------------
+explainer = shap.TreeExplainer(xgb_model, data=background_array)
 
-explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_df)
-shap_values_before = explainer.shap_values(X_before_df)
-shap_values_after  = explainer.shap_values(X_after_df)
+# Calcular valores SHAP
+shap_values_before = explainer.shap_values(X_before)
+shap_values_after  = explainer.shap_values(X_after)
 
-# Clase positiva (índice 1)
-shap_exp_before = shap_values_before[1] if isinstance(shap_values_before, list) else shap_values_before
-shap_exp_after  = shap_values_after[1]  if isinstance(shap_values_after, list) else shap_values_after
-
-# Gráficos Waterfall
+# ----------------------------
+# 5️⃣ Waterfall SHAP
+# ----------------------------
 st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_exp_before[0], max_display=10, show=False)
+    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_exp_after[0], max_display=10, show=False)
+    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
     st.pyplot(fig2)
 
 # ============================================================
