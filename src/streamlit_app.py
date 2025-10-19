@@ -189,14 +189,6 @@ except Exception as e:
     st.error(f"❌ Error cargando modelo: {e}")
     st.stop()
 
-# 🔧 Forzar base_score a float (parche temporal para TreeExplainer)
-booster = modelo_pipeline.named_steps['modelo'].get_booster()
-booster.set_param('base_score', float(booster.base_score))
-
-if isinstance(base_score, str):
-    base_score = base_score.replace('[','').replace(']','')  # quitar corchetes
-booster.set_param('base_score', float(base_score))
-
 features = df.columns.tolist()
 
 # ============================================================
@@ -285,86 +277,54 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-# ============================================================
-# 🧩 Predicción y SHAP seguro
-# ============================================================
-# Limpiar y preprocesar filas
-
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-xgb_model = modelo_pipeline.named_steps['modelo']
+model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
-background_clean = cleaner.transform(background)
-
 base_row_preprocessed = preprocessor.transform(base_row_clean)
 new_row_preprocessed = preprocessor.transform(new_row_clean)
+background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
+
+X_before = np.array(base_row_preprocessed)
+X_after = np.array(new_row_preprocessed)
+background_array = np.array(background_preprocessed)
+
+with st.spinner("🧠 Calculando valores SHAP..."):
+    explainer = shap.Explainer(model, background_array)
+    shap_values_before = explainer(X_before)
+    shap_values_after = explainer(X_after)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-# Función para convertir strings tipo '[1.23E-1]' a float
-def safe_float(x):
-    if isinstance(x, str):
-        x = x.replace("[", "").replace("]", "")
-    return float(x)
+exp_before = shap.Explanation(
+    values=shap_values_before.values[0],
+    base_values=np.mean(shap_values_before.base_values),
+    data=pd.Series(X_before[0], index=feat_names),
+    feature_names=feat_names
+)
+exp_after = shap.Explanation(
+    values=shap_values_after.values[0],
+    base_values=np.mean(shap_values_after.base_values),
+    data=pd.Series(X_after[0], index=feat_names),
+    feature_names=feat_names
+)
 
-# Copias de las filas y background como numpy arrays
-X_before = base_row.values
-X_after  = new_row.values
-background_array = background.values
+prob_before = expit(exp_before.base_values + exp_before.values.sum())
+prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
-# Probabilidades
-probs_before = modelo_pipeline.predict_proba(base_row)
-probs_after  = modelo_pipeline.predict_proba(new_row)
-
-prob_before = float(probs_before[0,1])
-prob_after  = float(probs_after[0,1])
-
-# Mostrar probabilidades
+# ============================================================
+# 📊 Probabilidades
+# ============================================================
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
-colA.markdown(
-    f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>"
-    f"Probabilidad original<br>{prob_before:.4f}</div>",
-    unsafe_allow_html=True
-)
-colB.markdown(
-    f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>"
-    f"Probabilidad modificada<br>{prob_after:.4f}</div>",
-    unsafe_allow_html=True
-)
-
-# ----------------------------
-# 4️⃣ Crear SHAP TreeExplainer
-# ----------------------------
-explainer = shap.TreeExplainer(xgb_model, data=background_array)
-
-# Calcular valores SHAP
-shap_values_before = explainer.shap_values(X_before)
-shap_values_after  = explainer.shap_values(X_after)
-
-# ----------------------------
-# 5️⃣ Waterfall SHAP
-# ----------------------------
-st.markdown("### 💧 Waterfall SHAP")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Antes de modificaciones")
-    fig1, ax1 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
-    st.pyplot(fig1)
-
-with col2:
-    st.subheader("Después de modificaciones")
-    fig2, ax2 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
-    st.pyplot(fig2)
+colA.markdown(f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad original<br>{prob_before:.4f}</div>", unsafe_allow_html=True)
+colB.markdown(f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad modificada<br>{prob_after:.4f}</div>", unsafe_allow_html=True)
 
 # ============================================================
-# Mostrar gráficos Waterfall
+# 💧 Waterfalls con nombres de variables
 # ============================================================
 st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
@@ -372,25 +332,15 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
-    exp_before = shap.Explanation(
-        values=shap_exp_before[0],
-        base_values=explainer.expected_value[1] if isinstance(explainer.expected_value, (list,np.ndarray)) else explainer.expected_value,
-        data=X_before[0],
-        feature_names=feat_names
-    )
     shap.plots.waterfall(exp_before, max_display=10, show=False)
+    plt.title("SHAP antes de modificaciones", color="white")
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
-    exp_after = shap.Explanation(
-        values=shap_exp_after[0],
-        base_values=explainer.expected_value[1] if isinstance(explainer.expected_value, (list,np.ndarray)) else explainer.expected_value,
-        data=X_after[0],
-        feature_names=feat_names
-    )
     shap.plots.waterfall(exp_after, max_display=10, show=False)
+    plt.title("SHAP después de modificaciones", color="white")
     st.pyplot(fig2)
 
 # ============================================================
@@ -417,7 +367,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     text_color = RGBColor(255, 255, 255)
     table_fill = RGBColor(230, 230, 230)
     table_text = RGBColor(0, 0, 0)
-    
+
     # Aplicar fondo gris a todas las diapositivas
     def apply_slide_bg(slide):
         fill = slide.background.fill
