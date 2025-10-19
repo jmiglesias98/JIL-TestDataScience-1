@@ -292,44 +292,51 @@ X_before = np.array(base_row_preprocessed)
 X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
+# --------------------------
+# 🧠 SHAP con KernelExplainer
+# --------------------------
 with st.spinner("🧠 Calculando valores SHAP..."):
-    # Usamos KernelExplainer universal (funciona con XGBoost, LightGBM, scikit, etc.)
-    # Nota: usa pocas muestras de background para que no sea lento
+
+    # Crear explainer universal (funciona con pipeline y XGBoost)
     explainer = shap.Explainer(model.predict_proba, background_array)
+
+    # Calcular shap_values
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
+# Nombres de features
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-def to_explanation(shap_values, X, feature_names):
-    # Si shap_values es una lista → prob. salida de predict_proba con 2 clases
-    if isinstance(shap_values, list):
-        shap_array = shap_values[1]  # clase positiva
-    # Si es un shap.Explanation, tomar .values
-    elif hasattr(shap_values, "values"):
-        shap_array = shap_values.values
+# Función helper para crear objetos Explanation válidos para waterfall
+def make_explanation(shap_values, X_row, feature_names):
+    # Si es objeto Explanation
+    if hasattr(shap_values, "values"):
+        vals = shap_values.values[0]  # primera fila
+        base = shap_values.base_values[0]
     else:
-        shap_array = shap_values
-
-    # Si es 2D (n_samples, n_features)
-    if shap_array.ndim == 2:
-        shap_array = shap_array[0]
-
-    # Calcular base value de forma segura
-    base_val = shap_values.base_values[0] if hasattr(shap_values, "base_values") else np.mean(shap_array)
-
+        vals = np.array(shap_values)[0]
+        base = np.mean(vals)
+    
     return shap.Explanation(
-        values=shap_array,
-        base_values=base_val,
-        data=pd.Series(X[0], index=feature_names),
+        values=vals,
+        base_values=base,
+        data=pd.Series(X_row[0], index=feature_names),
         feature_names=feature_names
     )
 
-exp_before = to_explanation(shap_values_before, X_before, feat_names)
-exp_after = to_explanation(shap_values_after, X_after, feat_names)
+# Crear explicaciones individuales para waterfall
+exp_before = make_explanation(shap_values_before, X_before, feat_names)
+exp_after = make_explanation(shap_values_after, X_after, feat_names)
 
-prob_before = expit(exp_before.base_values + exp_before.values.sum())
-prob_after = expit(exp_after.base_values + exp_after.values.sum())
+# --------------------------
+# 📊 Probabilidades
+# --------------------------
+# Extraer probabilidad clase positiva
+prob_before = model.predict_proba(X_before)
+prob_after = model.predict_proba(X_after)
+
+prob_before = float(np.array(prob_before).flatten()[-1])
+prob_after = float(np.array(prob_after).flatten()[-1])
 
 # Si el modelo es binario, extrae la probabilidad de clase positiva
 if isinstance(prob_before, (list, np.ndarray)):
