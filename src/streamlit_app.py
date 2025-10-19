@@ -280,9 +280,9 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-xgb_model = modelo_pipeline.named_steps['modelo']  # tu XGBClassifier
+xgb_model = modelo_pipeline.named_steps["modelo"]  # tu XGBClassifier
 
-# Limpiar y preprocesar filas
+# ---- 1️⃣ Limpiar y preprocesar filas ----
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
 background_clean = cleaner.transform(background)
@@ -295,22 +295,25 @@ X_before = np.array(base_row_preprocessed)
 X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
-feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
+feat_names = [
+    f.replace("num__", "").replace("cat__", "")
+    for f in preprocessor.get_feature_names_out()
+]
 
+# ---- 2️⃣ Función segura para convertir strings tipo '[1.23E-1]' a float ----
 def safe_float(x):
-    """Convierte string tipo '[1.23E-1]' a float real"""
     if isinstance(x, str):
-        x = x.replace('[', '').replace(']', '')
+        x = x.replace("[", "").replace("]", "")
     return float(x)
 
-# ---- Calcular probabilidades antes y después ----
-prob_before = xgb_model.predict_proba(X_before)
-prob_after = xgb_model.predict_proba(X_after)
+# ---- 3️⃣ Calcular probabilidades antes y después ----
+probs_before = xgb_model.predict_proba(X_before)
+probs_after = xgb_model.predict_proba(X_after)
 
 prob_before = safe_float(probs_before[0, 1])
 prob_after = safe_float(probs_after[0, 1])
 
-# Mostrar probabilidades
+# ---- Mostrar probabilidades ----
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
 colA.markdown(
@@ -324,53 +327,65 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-# ----------------------------
-# 2️⃣ Crear SHAP TreeExplainer
-# ----------------------------
-# Calcula las explicaciones SHAP
+# ============================================================
+# 4️⃣ Calcular SHAP
+# ============================================================
+
+# Crear explainer específico para modelos tipo árbol
 explainer = shap.TreeExplainer(xgb_model)
+
+# Calcular valores SHAP
 shap_values_before = explainer.shap_values(X_before)
 shap_values_after = explainer.shap_values(X_after)
 
-# 👉 Si es clasificación binaria, toma solo la clase positiva (índice 1)
-# Algunas versiones devuelven lista, otras devuelven un objeto con 3 dimensiones
-try:
-    shap_exp_before = shap_values_before[1]  # si es lista
+# Si el modelo es binario, tomamos solo la clase positiva (índice 1)
+if isinstance(shap_values_before, list):
+    shap_exp_before = shap_values_before[1]
     shap_exp_after = shap_values_after[1]
-except Exception:
-    # si no es lista, probablemente es un Explanation con varias clases
-    shap_exp_before = shap_values_before[..., 1] if shap_values_before.values.ndim == 3 else shap_values_before
-    shap_exp_after = shap_values_after[..., 1] if shap_values_after.values.ndim == 3 else shap_values_after
+elif len(np.shape(shap_values_before)) == 3:
+    shap_exp_before = shap_values_before[:, :, 1]
+    shap_exp_after = shap_values_after[:, :, 1]
+else:
+    shap_exp_before = shap_values_before
+    shap_exp_after = shap_values_after
 
-# ✅ Ahora graficamos solo una salida (la clase positiva)
-st.subheader("Waterfall antes de cambios")
-fig1, ax1 = plt.subplots(figsize=(8,6))
-shap.plots.waterfall(shap_exp_before[0], max_display=10, show=False)
-st.pyplot(fig1)
+# ============================================================
+# 5️⃣ Mostrar gráficos SHAP Waterfall
+# ============================================================
 
-st.subheader("Waterfall después de cambios")
-fig2, ax2 = plt.subplots(figsize=(8,6))
-shap.plots.waterfall(shap_exp_after[0], max_display=10, show=False)
-st.pyplot(fig2)
-
-
-# ----------------------------
-# 4️⃣ Waterfall SHAP
-# ----------------------------
 st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Antes de modificaciones")
-    fig1, ax1 = plt.subplots(figsize=(8,6))
+    fig1, ax1 = plt.subplots(figsize=(8, 6))
+    exp_before = shap.Explanation(
+        values=shap_exp_before[0],
+        base_values=explainer.expected_value[1]
+        if isinstance(explainer.expected_value, (list, np.ndarray))
+        else explainer.expected_value,
+        data=X_before[0],
+        feature_names=feat_names,
+    )
     shap.plots.waterfall(exp_before, max_display=10, show=False)
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
-    fig2, ax2 = plt.subplots(figsize=(8,6))
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
+    exp_after = shap.Explanation(
+        values=shap_exp_after[0],
+        base_values=explainer.expected_value[1]
+        if isinstance(explainer.expected_value, (list, np.ndarray))
+        else explainer.expected_value,
+        data=X_after[0],
+        feature_names=feat_names,
+    )
     shap.plots.waterfall(exp_after, max_display=10, show=False)
     st.pyplot(fig2)
+
+
+
     
 # ============================================================
 # 🖨️ PPTX con gráficas idénticas
