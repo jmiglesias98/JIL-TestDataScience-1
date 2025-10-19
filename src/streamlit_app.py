@@ -293,8 +293,7 @@ import streamlit as st
 # ----------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-xgb_model = modelo_pipeline.named_steps['modelo']
-booster = xgb_model.get_booster()  # objeto Booster puro para TreeExplainer
+xgb_model = modelo_pipeline.named_steps['classifier']  # tu XGBClassifier
 
 # Limpiar y preprocesar filas
 base_row_clean = cleaner.transform(base_row)
@@ -315,7 +314,7 @@ feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.
 # 2️⃣ Crear SHAP TreeExplainer
 # ----------------------------
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.TreeExplainer(booster, data=background_array, feature_perturbation="interventional")
+    explainer = shap.TreeExplainer(xgb_model, data=background_array) 
     shap_values_before = explainer.shap_values(X_before)
     shap_values_after = explainer.shap_values(X_after)
 
