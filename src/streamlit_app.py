@@ -293,7 +293,7 @@ import streamlit as st
 # ----------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-xgb_model = modelo_pipeline.named_steps['classifier']  # tu XGBClassifier
+xgb_model = modelo_pipeline.named_steps['modelo']  # tu XGBClassifier
 
 # Limpiar y preprocesar filas
 base_row_clean = cleaner.transform(base_row)
