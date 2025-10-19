@@ -314,7 +314,7 @@ feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.
 # 2️⃣ Crear SHAP TreeExplainer
 # ----------------------------
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.TreeExplainer(xgb_model, data=background_array) 
+    explainer = shap.KernelExplainer(xgb_model.predict_proba, background_array)
     shap_values_before = explainer.shap_values(X_before)
     shap_values_after = explainer.shap_values(X_after)
 
