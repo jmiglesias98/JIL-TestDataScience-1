@@ -189,6 +189,11 @@ except Exception as e:
     st.error(f"❌ Error cargando modelo: {e}")
     st.stop()
 
+# 🔧 Forzar base_score a float (parche temporal para TreeExplainer)
+booster = modelo_pipeline.named_steps['modelo'].get_booster()
+booster.set_param('base_score', float(booster.base_score))
+
+
 features = df.columns.tolist()
 
 # ============================================================
