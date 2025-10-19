@@ -277,23 +277,10 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-import streamlit as st
-import pandas as pd
-import numpy as np
-import shap
-from scipy.special import expit
-import matplotlib.pyplot as plt
-
-# ============================================================
-# 🔹 Extraer pasos de la pipeline
-# ============================================================
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 
-# ============================================================
-# 🔹 Limpiar y preprocesar filas
-# ============================================================
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
 base_row_preprocessed = preprocessor.transform(base_row_clean)
@@ -301,49 +288,30 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
 
-# ============================================================
-# 🔹 Crear DataFrames correctos (2D y con columnas)
-# ============================================================
-feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
+X_before = np.array(base_row_preprocessed)
+X_after = np.array(new_row_preprocessed)
+background_array = np.array(background_preprocessed)
 
-X_before = pd.DataFrame(base_row_preprocessed, columns=feat_names)
-X_after = pd.DataFrame(new_row_preprocessed, columns=feat_names)
-background_df = pd.DataFrame(background_preprocessed, columns=feat_names)
-
-# ============================================================
-# 🔹 Definir wrapper callable para SHAP
-# ============================================================
-def pipeline_predict(X):
-    return modelo_pipeline.predict_proba(X)[:, 1]
-
-# ============================================================
-# 🔹 Calcular valores SHAP
-# ============================================================
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.Explainer(pipeline_predict, background_df)
+    explainer = shap.Explainer(model, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
-# ============================================================
-# 🔹 Crear objetos Explanation
-# ============================================================
+feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
+
 exp_before = shap.Explanation(
     values=shap_values_before.values[0],
     base_values=np.mean(shap_values_before.base_values),
-    data=pd.Series(X_before.iloc[0].values, index=feat_names),
+    data=pd.Series(X_before[0], index=feat_names),
     feature_names=feat_names
 )
-
 exp_after = shap.Explanation(
     values=shap_values_after.values[0],
     base_values=np.mean(shap_values_after.base_values),
-    data=pd.Series(X_after.iloc[0].values, index=feat_names),
+    data=pd.Series(X_after[0], index=feat_names),
     feature_names=feat_names
 )
 
-# ============================================================
-# 🔹 Calcular probabilidades
-# ============================================================
 prob_before = expit(exp_before.base_values + exp_before.values.sum())
 prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
@@ -352,14 +320,8 @@ prob_after = expit(exp_after.base_values + exp_after.values.sum())
 # ============================================================
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
-colA.markdown(
-    f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad original<br>{prob_before:.4f}</div>",
-    unsafe_allow_html=True
-)
-colB.markdown(
-    f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad modificada<br>{prob_after:.4f}</div>",
-    unsafe_allow_html=True
-)
+colA.markdown(f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad original<br>{prob_before:.4f}</div>", unsafe_allow_html=True)
+colB.markdown(f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad modificada<br>{prob_after:.4f}</div>", unsafe_allow_html=True)
 
 # ============================================================
 # 💧 Waterfalls con nombres de variables
@@ -380,7 +342,6 @@ with col2:
     shap.plots.waterfall(exp_after, max_display=10, show=False)
     plt.title("SHAP después de modificaciones", color="white")
     st.pyplot(fig2)
-
 
 # ============================================================
 # 🖨️ PPTX con gráficas idénticas
