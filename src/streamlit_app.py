@@ -279,7 +279,7 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
+model = modelo_pipeline.named_steps["modelo"]
 
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
