@@ -335,20 +335,28 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 # -------------------------------------------------------------------
 # 3️⃣ Función helper para convertir shap_values en Explanation 1D
 # -------------------------------------------------------------------
-def make_explanation(shap_values_class, X_row, feature_names):
-    # shap_values_class: array 2D (n_samples, n_features)
-    vals = shap_values_class[0]  # primera fila
-    base = 0.5  # KernelExplainer base_value aproximado
+def make_explanation(shap_values, X_row, feature_names):
+    """
+    Convierte cualquier shap_values en shap.Explanation 1D para waterfall.
+    Funciona si shap_values es:
+      - array 2D (n_samples × n_features)
+      - lista de arrays por clase
+    """
+    # Si es lista de arrays (por clase)
+    if isinstance(shap_values, list):
+        vals = shap_values[-1][0]  # última clase, primera fila
+        base = 0.5
+    else:
+        # shap_values es array 2D
+        vals = shap_values[0]  # primera fila
+        base = 0.5
+
     return shap.Explanation(
         values=vals,
         base_values=base,
         data=pd.Series(X_row[0], index=feature_names),
         feature_names=feature_names
     )
-
-# Tomamos la clase positiva (1) para mostrar
-exp_before = make_explanation(shap_values_before[1], X_before, feat_names)
-exp_after = make_explanation(shap_values_after[1], X_after, feat_names)
 
 # -------------------------------------------------------------------
 # 4️⃣ Calcular probabilidades
