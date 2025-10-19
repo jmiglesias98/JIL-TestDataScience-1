@@ -331,7 +331,7 @@ colB.markdown(
 # SHAP con KernelExplainer (compatible con cualquier modelo)
 # ============================================================
 
-explainer = shap.KernelExplainer(xgb.predict_proba, background_array)
+explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_array)
 shap_values_before = explainer.shap_values(X_before)
 shap_values_after  = explainer.shap_values(X_after)
 
