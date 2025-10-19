@@ -1,4 +1,4 @@
-# ============================================================
+ ============================================================
 # 🔧 Imports
 # ============================================================
 import pandas as pd
@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from xgboost import XGBClassifier
+
 # Para generar PPTX
 try:
     from pptx import Presentation
@@ -277,10 +277,9 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-model = modelo_pipeline.named_steps["modelo"]
+model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
@@ -289,9 +288,9 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
 
-X_before = preprocessor.transform(base_row).astype(np.float32).reshape(1, -1)
-X_after = preprocessor.transform(new_row).astype(np.float32).reshape(1, -1)
-background_array = preprocessor.transform(background).astype(np.float32)
+X_before = np.array(base_row_preprocessed)
+X_after = np.array(new_row_preprocessed)
+background_array = np.array(background_preprocessed)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model.predict, background_array)
