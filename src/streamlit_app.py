@@ -302,11 +302,25 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
 def to_explanation(shap_values, X, feature_names):
+    # Si shap_values es una lista → prob. salida de predict_proba con 2 clases
     if isinstance(shap_values, list):
-        shap_values = shap_values[1]
+        shap_array = shap_values[1]  # clase positiva
+    # Si es un shap.Explanation, tomar .values
+    elif hasattr(shap_values, "values"):
+        shap_array = shap_values.values
+    else:
+        shap_array = shap_values
+
+    # Si es 2D (n_samples, n_features)
+    if shap_array.ndim == 2:
+        shap_array = shap_array[0]
+
+    # Calcular base value de forma segura
+    base_val = shap_values.base_values[0] if hasattr(shap_values, "base_values") else np.mean(shap_array)
+
     return shap.Explanation(
-        values=shap_values[0],
-        base_values=np.mean(shap_values[0]),
+        values=shap_array,
+        base_values=base_val,
         data=pd.Series(X[0], index=feature_names),
         feature_names=feature_names
     )
