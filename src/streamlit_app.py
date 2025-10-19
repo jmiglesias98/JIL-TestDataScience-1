@@ -293,7 +293,7 @@ X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.Explainer(model.predict, background_array)
+    explainer = shap.Explainer(model.predict_proba, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
