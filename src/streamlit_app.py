@@ -328,14 +328,14 @@ def to_explanation(shap_values, X, feature_names):
 exp_before = to_explanation(shap_values_before, X_before, feat_names)
 exp_after = to_explanation(shap_values_after, X_after, feat_names)
 
+prob_before = expit(exp_before.base_values + exp_before.values.sum())
+prob_after = expit(exp_after.base_values + exp_after.values.sum())
+
 # Si el modelo es binario, extrae la probabilidad de clase positiva
 if isinstance(prob_before, (list, np.ndarray)):
     prob_before = np.array(prob_before).flatten()[-1]  # última columna = clase 1
 if isinstance(prob_after, (list, np.ndarray)):
     prob_after = np.array(prob_after).flatten()[-1]
-
-prob_before = expit(exp_before.base_values + exp_before.values.sum())
-prob_after = expit(exp_after.base_values + exp_after.values.sum())
 
 # ============================================================
 # 📊 Probabilidades
