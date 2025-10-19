@@ -278,7 +278,7 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # 🧩 Predicción y SHAP
 # ============================================================
 
-print(base_row)
+st.write(base_row)
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 model = modelo_pipeline.named_steps["modelo"]
