@@ -292,35 +292,53 @@ X_before = np.array(base_row_preprocessed)
 X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
-# --------------------------
-# 🧠 SHAP con KernelExplainer
-# --------------------------
-with st.spinner("🧠 Calculando valores SHAP..."):
+# ============================================================
+# 🧩 Predicción, SHAP y Waterfall
+# ============================================================
 
-    # Crear explainer universal (funciona con pipeline y XGBoost)
-    explainer = shap.Explainer(model.predict_proba, background_array)
+import shap
+from scipy.special import expit
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
-    # Calcular shap_values
-    shap_values_before = explainer(X_before)
-    shap_values_after = explainer(X_after)
+# -------------------------------------------------------------------
+# 1️⃣ Preparar datos
+# -------------------------------------------------------------------
+cleaner = modelo_pipeline.named_steps["cleaner"]
+preprocessor = modelo_pipeline.named_steps["preprocessor"]
+model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
 
-# Nombres de features
+# Limpiar y preprocesar
+base_row_clean = cleaner.transform(base_row)
+new_row_clean = cleaner.transform(new_row)
+background_clean = cleaner.transform(background)
+
+base_row_preprocessed = preprocessor.transform(base_row_clean)
+new_row_preprocessed = preprocessor.transform(new_row_clean)
+background_preprocessed = preprocessor.transform(background_clean)
+
+X_before = np.array(base_row_preprocessed)
+X_after = np.array(new_row_preprocessed)
+background_array = np.array(background_preprocessed)
+
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-# Helper para crear Explanation válido para waterfall
-def make_explanation(shap_values, X_row, feature_names):
-    # KernelExplainer devuelve shap_values con .values (n_samples, n_features) o lista por clase
-    if isinstance(shap_values, list):
-        # Seleccionamos clase positiva (1)
-        vals = shap_values[1].values[0]
-        base = shap_values[1].base_values[0]
-    elif hasattr(shap_values, "values"):
-        vals = shap_values.values[0]  # primera fila
-        base = shap_values.base_values[0]
-    else:
-        vals = np.array(shap_values)[0]
-        base = np.mean(vals)
-    
+# -------------------------------------------------------------------
+# 2️⃣ Crear explainer (KernelExplainer compatible con cualquier XGBoost)
+# -------------------------------------------------------------------
+with st.spinner("🧠 Calculando valores SHAP..."):
+    explainer = shap.KernelExplainer(model.predict_proba, background_array)
+    shap_values_before = explainer.shap_values(X_before)
+    shap_values_after = explainer.shap_values(X_after)
+
+# -------------------------------------------------------------------
+# 3️⃣ Función helper para convertir shap_values en Explanation 1D
+# -------------------------------------------------------------------
+def make_explanation(shap_values_class, X_row, feature_names):
+    # shap_values_class: array 2D (n_samples, n_features)
+    vals = shap_values_class[0]  # primera fila
+    base = 0.5  # KernelExplainer base_value aproximado
     return shap.Explanation(
         values=vals,
         base_values=base,
@@ -328,37 +346,33 @@ def make_explanation(shap_values, X_row, feature_names):
         feature_names=feature_names
     )
 
-# Crear explicaciones listas para waterfall
-exp_before = make_explanation(shap_values_before, X_before, feat_names)
-exp_after = make_explanation(shap_values_after, X_after, feat_names)
+# Tomamos la clase positiva (1) para mostrar
+exp_before = make_explanation(shap_values_before[1], X_before, feat_names)
+exp_after = make_explanation(shap_values_after[1], X_after, feat_names)
 
-# --------------------------
-# 📊 Probabilidades
-# --------------------------
-# Extraer probabilidad clase positiva
-prob_before = model.predict_proba(X_before)
-prob_after = model.predict_proba(X_after)
+# -------------------------------------------------------------------
+# 4️⃣ Calcular probabilidades
+# -------------------------------------------------------------------
+prob_before = float(model.predict_proba(X_before)[0,1])
+prob_after = float(model.predict_proba(X_after)[0,1])
 
-prob_before = float(np.array(prob_before).flatten()[-1])
-prob_after = float(np.array(prob_after).flatten()[-1])
-
-# Si el modelo es binario, extrae la probabilidad de clase positiva
-if isinstance(prob_before, (list, np.ndarray)):
-    prob_before = np.array(prob_before).flatten()[-1]  # última columna = clase 1
-if isinstance(prob_after, (list, np.ndarray)):
-    prob_after = np.array(prob_after).flatten()[-1]
-
-# ============================================================
-# 📊 Probabilidades
-# ============================================================
+# Mostrar en Streamlit
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
-colA.markdown(f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad original<br>{prob_before:.4f}</div>", unsafe_allow_html=True)
-colB.markdown(f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>Probabilidad modificada<br>{prob_after:.4f}</div>", unsafe_allow_html=True)
+colA.markdown(
+    f"<div style='background-color:#1f77b4; padding:10px; border-radius:5px; color:white; text-align:center;'>"
+    f"Probabilidad original<br>{prob_before:.4f}</div>",
+    unsafe_allow_html=True
+)
+colB.markdown(
+    f"<div style='background-color:#ff7f0e; padding:10px; border-radius:5px; color:white; text-align:center;'>"
+    f"Probabilidad modificada<br>{prob_after:.4f}</div>",
+    unsafe_allow_html=True
+)
 
-# ============================================================
-# 💧 Waterfalls con nombres de variables
-# ============================================================
+# -------------------------------------------------------------------
+# 5️⃣ Waterfall SHAP
+# -------------------------------------------------------------------
 st.markdown("### 💧 Waterfall SHAP")
 col1, col2 = st.columns(2)
 
@@ -366,15 +380,14 @@ with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(exp_before, max_display=10, show=False)
-    plt.title("SHAP antes de modificaciones", color="white")
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(exp_after, max_display=10, show=False)
-    plt.title("SHAP después de modificaciones", color="white")
     st.pyplot(fig2)
+
 
 # ============================================================
 # 🖨️ PPTX con gráficas idénticas
