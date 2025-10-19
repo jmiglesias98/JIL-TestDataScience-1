@@ -332,8 +332,7 @@ colB.markdown(
 # ============================================================
 
 # Crear explainer específico para modelos tipo árbol
-booster_model = xgb_model.get_booster()
-explainer = shap.TreeExplainer(booster_model)
+explainer = shap.TreeExplainer(xgb_model)
 
 # Calcular valores SHAP
 shap_values_before = explainer.shap_values(X_before)
