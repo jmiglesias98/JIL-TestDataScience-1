@@ -294,7 +294,7 @@ X_after = preprocessor.transform(new_row).astype(np.float32).reshape(1, -1)
 background_array = preprocessor.transform(background).astype(np.float32)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.Explainer(mejor_pipeline, background_array)
+    explainer = shap.Explainer(modelo_pipeline, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
