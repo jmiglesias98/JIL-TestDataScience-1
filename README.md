@@ -22,9 +22,18 @@ El proyecto combina análisis exploratorio de datos, construcción y evaluación
 | `Dockerfile`           | Define la imagen Docker que incluye todas las dependencias y configuraciones necesarias para ejecutar el proyecto de manera consistente. |
 | `requirements.txt`     | Lista de bibliotecas de Python con versiones específicas para garantizar compatibilidad y reproducibilidad. |
 
+## Notebooks
+
+Scripts utilizados en el desarrollo de la solución.
+
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+| `01_classification_analysis_test_1.ipynb`  | Notebook que contiene el desarrollo del caso práctico y la argumentación del mismo. |
+| `01_classification_analysis_test_1.html`   | Notebook renderizado. |
+
 ## Devops
 
-A continuación se enumeran los distintos scripts utilizados en la operativización del producto.
+A continuación se enumeran los distintos scripts y utilizados en la operativización del producto.
 
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
@@ -35,6 +44,27 @@ A continuación se enumeran los distintos scripts utilizados en la operativizaci
 | `load_model.py`             | Se encarga de cargar el modelo entrenado desde almacenamiento persistente para su uso en predicciones. |
 | `inference.py`              | Funciones para realizar inferencias/predicciones usando el modelo entrenado. |
 | `streamlit_app.py`          | Aplicación web interactiva usando Streamlit para que el equipo de Marketing pueda realizar simulaciones What-If. |
+| `streamlit_app.py`          | Aplicación web interactiva usando Streamlit para que el equipo de Marketing pueda realizar simulaciones What-If. |
+
+## Modelos
+
+En la siguiente tabla se enumeran los modelos a productivizar.
+
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+
+| `mejor_modelo_20251016.joblib` | Modelo ganador - XGBoost con AUC-ROC del 93%. |
+
+## Datos
+
+Datos de entrada y salida utilizados en el caso práctico.
+
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+
+| `bank-full.csv` | Fichero sin tratar descargado de kaggle que sirve como starting point de este caso práctico. |
+| `clientes_20251016.csv` | Fichero equivalente al anterior con la diferencia de que no presenta la variable objetivo.  |
+| `clientes_20251016_predicciones.csv` | Salida obtenida de la ejecución del modelo productivizado. |
 
 ## Requisitos
 
