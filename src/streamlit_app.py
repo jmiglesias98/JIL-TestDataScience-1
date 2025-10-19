@@ -324,6 +324,21 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 prob_before = float(xgb_model.predict_proba(X_before)[0,1])
 prob_after = float(xgb_model.predict_proba(X_after)[0,1])
 
+# Crear objeto Explanation
+exp_before = shap.Explanation(
+    values=shap_values_before[0],
+    base_values=explainer.expected_value[1],  # para la clase positiva
+    data=X_before[0],
+    feature_names=feat_names
+)
+
+exp_after = shap.Explanation(
+    values=shap_values_after[0],
+    base_values=explainer.expected_value[1],
+    data=X_after[0],
+    feature_names=feat_names
+)
+
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
@@ -347,32 +362,13 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
+    shap.plots.waterfall(exp_before, max_display=10, show=False)
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
-    st.pyplot(fig2)
-
-
-# ----------------------------
-# 4️⃣ Waterfall SHAP
-# ----------------------------
-st.markdown("### 💧 Waterfall SHAP")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Antes de modificaciones")
-    fig1, ax1 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
-    st.pyplot(fig1)
-
-with col2:
-    st.subheader("Después de modificaciones")
-    fig2, ax2 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
+    shap.plots.waterfall(exp_after, max_display=10, show=False)
     st.pyplot(fig2)
     
 # ============================================================
