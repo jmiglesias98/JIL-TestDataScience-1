@@ -297,9 +297,18 @@ background_array = np.array(background_preprocessed)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
+def safe_float(x):
+    """Convierte string tipo '[1.23E-1]' a float real"""
+    if isinstance(x, str):
+        x = x.replace('[', '').replace(']', '')
+    return float(x)
+
 # ---- Calcular probabilidades antes y después ----
-prob_before = float(xgb_model.predict_proba(X_before)[0, 1])
-prob_after = float(xgb_model.predict_proba(X_after)[0, 1])
+prob_before = xgb_model.predict_proba(X_before)
+prob_after = xgb_model.predict_proba(X_after)
+
+prob_before = safe_float(probs_before[0, 1])
+prob_after = safe_float(probs_after[0, 1])
 
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
