@@ -294,9 +294,9 @@ base_row_preprocessed = preprocessor.transform(base_row_clean)
 new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_preprocessed = preprocessor.transform(background_clean)
 
-X_before = np.array(base_row_preprocessed)
-X_after = np.array(new_row_preprocessed)
-background_array = np.array(background_preprocessed)
+background_df = pd.DataFrame(background_preprocessed, columns=feat_names)
+X_before_df  = pd.DataFrame(X_before, columns=feat_names)
+X_after_df   = pd.DataFrame(X_after, columns=feat_names)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
