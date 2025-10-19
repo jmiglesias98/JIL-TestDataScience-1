@@ -277,30 +277,24 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-cleaner = modelo_pipeline.named_steps["cleaner"]
-preprocessor = modelo_pipeline.named_steps["preprocessor"]
-model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
-
-base_row_clean = cleaner.transform(base_row)
-new_row_clean = cleaner.transform(new_row)
-base_row_preprocessed = preprocessor.transform(base_row_clean)
-new_row_preprocessed = preprocessor.transform(new_row_clean)
-background_clean = cleaner.transform(background)
-background_preprocessed = preprocessor.transform(background_clean)
-
-X_before = np.array(base_row_preprocessed)
-X_after = np.array(new_row_preprocessed)
-background_array = np.array(background_preprocessed)
-
 # ============================================================
-# 🧩 Predicción, SHAP y Waterfall
+# 🧩 Predicción + SHAP TreeExplainer + Probabilidades + Waterfall
 # ============================================================
+
+import shap
+from scipy.special import expit
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import streamlit as st
+
 # ----------------------------
 # 1️⃣ Preparar datos
 # ----------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
-model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
+xgb_model = modelo_pipeline.named_steps['modelo']
+booster = xgb_model.get_booster()  # objeto Booster puro para TreeExplainer
 
 # Limpiar y preprocesar filas
 base_row_clean = cleaner.transform(base_row)
@@ -318,18 +312,18 @@ background_array = np.array(background_preprocessed)
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
 # ----------------------------
-# 2️⃣ Crear SHAP TreeExplainer (XGBoost)
+# 2️⃣ Crear SHAP TreeExplainer
 # ----------------------------
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.TreeExplainer(model, data=background_array, feature_perturbation="interventional")
-    shap_values_before = explainer(X_before)
-    shap_values_after = explainer(X_after)
+    explainer = shap.TreeExplainer(booster, data=background_array, feature_perturbation="interventional")
+    shap_values_before = explainer.shap_values(X_before)
+    shap_values_after = explainer.shap_values(X_after)
 
 # ----------------------------
 # 3️⃣ Calcular probabilidades
 # ----------------------------
-prob_before = float(model.predict_proba(X_before)[0,1])
-prob_after = float(model.predict_proba(X_after)[0,1])
+prob_before = float(xgb_model.predict_proba(X_before)[0,1])
+prob_after = float(xgb_model.predict_proba(X_after)[0,1])
 
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
@@ -344,6 +338,25 @@ colB.markdown(
     f"Probabilidad modificada<br>{prob_after:.4f}</div>",
     unsafe_allow_html=True
 )
+
+# ----------------------------
+# 4️⃣ Waterfall SHAP
+# ----------------------------
+st.markdown("### 💧 Waterfall SHAP")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Antes de modificaciones")
+    fig1, ax1 = plt.subplots(figsize=(8,6))
+    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
+    st.pyplot(fig1)
+
+with col2:
+    st.subheader("Después de modificaciones")
+    fig2, ax2 = plt.subplots(figsize=(8,6))
+    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
+    st.pyplot(fig2)
+
 
 # ----------------------------
 # 4️⃣ Waterfall SHAP
