@@ -327,23 +327,38 @@ prob_after = float(xgb_model.predict_proba(X_after)[0,1])
 X_before_row = np.ravel(X_before[0])
 X_after_row  = np.ravel(X_after[0])
 
-shap_values_pos_before = shap_values_before[0]  # fila 0
-shap_values_pos_after  = shap_values_after[0]
+shap_values_before = shap_values_before[0]  # fila 0
+shap_values_after  = shap_values_after[0]
 
 # Crear objetos Explanation
 exp_before = shap.Explanation(
-    values=shap_values_pos_before,
+    values=shap_values_before,
     base_values=explainer.expected_value,  # para KernelExplainer, un único valor
     data=X_before_row,
     feature_names=feat_names
 )
 
 exp_after = shap.Explanation(
-    values=shap_values_pos_after,
+    values=shap_values_after,
     base_values=explainer.expected_value,
     data=X_after_row,
     feature_names=feat_names
 )
+
+
+shap_values_row = shap_values_before[0]  # array de SHAP values para la fila
+X_row = X_before[0]                       # features para esa fila
+
+# Mostrar Force Plot como matplotlib
+fig, ax = plt.subplots(figsize=(10, 3))
+shap.force_plot(
+    base_value=float(explainer.expected_value),
+    shap_values=shap_values_row,
+    features=X_row,
+    feature_names=feat_names,
+    matplotlib=True
+)
+st.pyplot(fig)
 
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
