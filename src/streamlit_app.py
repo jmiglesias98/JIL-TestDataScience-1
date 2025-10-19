@@ -289,7 +289,9 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
 
-st.write("Tipo de model:", type(model))
+X_before = preprocessor.transform(base_row).astype(np.float32).reshape(1, -1)
+X_after = preprocessor.transform(new_row).astype(np.float32).reshape(1, -1)
+background_array = preprocessor.transform(background).astype(np.float32)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
     explainer = shap.Explainer(model, background_array)
