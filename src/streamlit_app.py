@@ -295,6 +295,9 @@ background_array = np.array(background_preprocessed)
 # ============================================================
 # 🧩 Predicción, SHAP y Waterfall
 # ============================================================
+# ----------------------------
+# 1️⃣ Preparar datos
+# ----------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 model = modelo_pipeline.named_steps[list(modelo_pipeline.named_steps.keys())[-1]]
@@ -351,13 +354,13 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("Antes de modificaciones")
     fig1, ax1 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)  # primera fila
+    shap.plots.waterfall(shap_values_before[0], max_display=10, show=False)
     st.pyplot(fig1)
 
 with col2:
     st.subheader("Después de modificaciones")
     fig2, ax2 = plt.subplots(figsize=(8,6))
-    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)  # primera fila
+    shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)
     st.pyplot(fig2)
     
 # ============================================================
@@ -384,7 +387,7 @@ def create_pptx_dark_centered(prob_before, prob_after, comparacion_df, fig_befor
     text_color = RGBColor(255, 255, 255)
     table_fill = RGBColor(230, 230, 230)
     table_text = RGBColor(0, 0, 0)
-
+    
     # Aplicar fondo gris a todas las diapositivas
     def apply_slide_bg(slide):
         fill = slide.background.fill
