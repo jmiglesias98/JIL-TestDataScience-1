@@ -277,20 +277,7 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # ============================================================
 # 🧩 Predicción y SHAP
 # ============================================================
-# ============================================================
-# 🧩 Predicción + SHAP TreeExplainer + Probabilidades + Waterfall
-# ============================================================
 
-import shap
-from scipy.special import expit
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import streamlit as st
-
-# ----------------------------
-# 1️⃣ Preparar datos
-# ----------------------------
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 xgb_model = modelo_pipeline.named_steps['modelo']  # tu XGBClassifier
@@ -327,8 +314,6 @@ colB.markdown(
 # ----------------------------
 # 2️⃣ Crear SHAP TreeExplainer
 # ----------------------------
-with st.spinner("🧠 Calculando valores SHAP..."):
-
 # Calcula las explicaciones SHAP
 explainer = shap.Explainer(xgb_model, background_array)
 shap_values_before = explainer(X_before)
