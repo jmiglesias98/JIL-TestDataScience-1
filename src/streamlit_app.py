@@ -278,7 +278,6 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # 🧩 Predicción y SHAP
 # ============================================================
 
-st.write(base_row)
 cleaner = modelo_pipeline.named_steps["cleaner"]
 preprocessor = modelo_pipeline.named_steps["preprocessor"]
 model = modelo_pipeline.named_steps["modelo"]
@@ -290,6 +289,9 @@ new_row_preprocessed = preprocessor.transform(new_row_clean)
 background_clean = cleaner.transform(background)
 background_preprocessed = preprocessor.transform(background_clean)
 
+st.write(base_row_clean)
+st.write(base_row_preprocessed)
+st.write(background_clean)
 X_before = np.array(base_row_preprocessed)
 X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
