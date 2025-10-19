@@ -297,7 +297,7 @@ background_preprocessed = preprocessor.transform(background_clean)
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
 background_df = pd.DataFrame(background_preprocessed, columns=feat_names)
-X_before_  = pd.DataFrame(X_before, columns=feat_names)
+X_before  = pd.DataFrame(X_before, columns=feat_names)
 X_after   = pd.DataFrame(X_after, columns=feat_names)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
