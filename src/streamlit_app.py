@@ -328,9 +328,9 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-background_df = pd.DataFrame(background, columns=df.columns)
-X_before_df  = pd.DataFrame(base_row, columns=df.columns)
-X_after_df   = pd.DataFrame(new_row, columns=df.columns)
+background_df = background.copy()
+X_before_df  = base_row.copy()
+X_after_df   = new_row.copy()
 
 explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_df)
 shap_values_before = explainer.shap_values(X_before_df)
