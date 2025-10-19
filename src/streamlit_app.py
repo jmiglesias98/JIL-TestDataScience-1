@@ -296,7 +296,11 @@ X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
-  
+
+# ---- Calcular probabilidades antes y después ----
+prob_before = float(xgb_model.predict_proba(X_before)[0, 1])
+prob_after = float(xgb_model.predict_proba(X_after)[0, 1])
+
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
