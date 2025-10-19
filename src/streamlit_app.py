@@ -301,15 +301,28 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
+feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
+
+# Si el resultado del explainer es una lista, tomar el primero (probabilidad clase positiva)
+if isinstance(shap_values_before, list):
+    shap_values_before = shap_values_before[1]  # clase 1
+    shap_values_after = shap_values_after[1]
+
+# Asegurar que sean arrays 1D
+values_before = np.array(shap_values_before[0])
+values_after = np.array(shap_values_after[0])
+
+# Crear objetos Explanation válidos para waterfall
 exp_before = shap.Explanation(
-    values=shap_values_before.values[0],
-    base_values=np.mean(shap_values_before.base_values),
+    values=values_before,
+    base_values=np.mean(values_before),
     data=pd.Series(X_before[0], index=feat_names),
     feature_names=feat_names
 )
+
 exp_after = shap.Explanation(
-    values=shap_values_after.values[0],
-    base_values=np.mean(shap_values_after.base_values),
+    values=values_after,
+    base_values=np.mean(values_after),
     data=pd.Series(X_after[0], index=feat_names),
     feature_names=feat_names
 )
