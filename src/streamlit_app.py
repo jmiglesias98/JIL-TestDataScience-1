@@ -328,10 +328,13 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-# SHAP usando KernelExplainer (compatible con cualquier modelo)
-explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_array)
-shap_values_before = explainer.shap_values(X_before)
-shap_values_after  = explainer.shap_values(X_after)
+background_df = pd.DataFrame(background, columns=df.columns)
+X_before_df  = pd.DataFrame(base_row, columns=df.columns)
+X_after_df   = pd.DataFrame(new_row, columns=df.columns)
+
+explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_df)
+shap_values_before = explainer.shap_values(X_before_df)
+shap_values_after  = explainer.shap_values(X_after_df)
 
 # Clase positiva (índice 1)
 shap_exp_before = shap_values_before[1] if isinstance(shap_values_before, list) else shap_values_before
