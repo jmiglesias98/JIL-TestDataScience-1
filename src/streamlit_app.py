@@ -324,21 +324,20 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 prob_before = float(xgb_model.predict_proba(X_before)[0,1])
 prob_after = float(xgb_model.predict_proba(X_after)[0,1])
 
-shap_values_pos = shap_values_before[1][0]  # fila 0, clase 1
+shap_values_pos_before = shap_values_before[0]  # fila 0
+shap_values_pos_after  = shap_values_after[0]
 
-# Crear objeto Explanation
+# Crear objetos Explanation
 exp_before = shap.Explanation(
-    values=shap_values_before[0],
-    base_values=explainer.expected_value[1],  # para la clase positiva
+    values=shap_values_pos_before,
+    base_values=explainer.expected_value,  # para KernelExplainer, un único valor
     data=X_before[0],
     feature_names=feat_names
 )
 
-shap_values_pos_after = shap_values_after[1][0]
-
 exp_after = shap.Explanation(
-    values=shap_values_after[0],
-    base_values=explainer.expected_value[1],
+    values=shap_values_pos_after,
+    base_values=explainer.expected_value,
     data=X_after[0],
     feature_names=feat_names
 )
