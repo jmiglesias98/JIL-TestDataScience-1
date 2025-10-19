@@ -359,7 +359,7 @@ with col2:
     fig2, ax2 = plt.subplots(figsize=(8,6))
     shap.plots.waterfall(shap_values_after[0], max_display=10, show=False)  # primera fila
     st.pyplot(fig2)
-
+    
 # ============================================================
 # 🖨️ PPTX con gráficas idénticas
 # ============================================================
