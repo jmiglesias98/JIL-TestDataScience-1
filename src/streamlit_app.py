@@ -324,6 +324,8 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 prob_before = float(xgb_model.predict_proba(X_before)[0,1])
 prob_after = float(xgb_model.predict_proba(X_after)[0,1])
 
+shap_values_pos = shap_values_before[1][0]  # fila 0, clase 1
+
 # Crear objeto Explanation
 exp_before = shap.Explanation(
     values=shap_values_before[0],
@@ -331,6 +333,8 @@ exp_before = shap.Explanation(
     data=X_before[0],
     feature_names=feat_names
 )
+
+shap_values_pos_after = shap_values_after[1][0]
 
 exp_after = shap.Explanation(
     values=shap_values_after[0],
