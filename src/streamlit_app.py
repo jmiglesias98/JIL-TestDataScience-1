@@ -345,21 +345,6 @@ exp_after = shap.Explanation(
     feature_names=feat_names
 )
 
-
-shap_values_row = shap_values_before[0]  # array de SHAP values para la fila
-X_row = X_before[0]                       # features para esa fila
-
-# Mostrar Force Plot como matplotlib
-fig, ax = plt.subplots(figsize=(10, 3))
-shap.force_plot(
-    base_value=float(explainer.expected_value),
-    shap_values=shap_values_row,
-    features=X_row,
-    feature_names=feat_names,
-    matplotlib=True
-)
-st.pyplot(fig)
-
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
