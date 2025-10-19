@@ -281,6 +281,11 @@ st.dataframe(comparacion.style.apply(highlight_changes, axis=1), use_container_w
 # 🧩 Predicción y SHAP seguro
 # ============================================================
 # Limpiar y preprocesar filas
+
+cleaner = modelo_pipeline.named_steps["cleaner"]
+preprocessor = modelo_pipeline.named_steps["preprocessor"]
+xgb_model = modelo_pipeline.named_steps['modelo']
+
 base_row_clean = cleaner.transform(base_row)
 new_row_clean = cleaner.transform(new_row)
 background_clean = cleaner.transform(background)
