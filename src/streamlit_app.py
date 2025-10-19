@@ -309,42 +309,7 @@ X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
-
-# ----------------------------
-# 2️⃣ Crear SHAP TreeExplainer
-# ----------------------------
-with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.KernelExplainer(xgb_model.predict_proba, background_array)
-    shap_values_before = explainer.shap_values(X_before)
-    shap_values_after = explainer.shap_values(X_after)
-
-# ----------------------------
-# 3️⃣ Calcular probabilidades
-# ----------------------------
-prob_before = float(xgb_model.predict_proba(X_before)[0,1])
-prob_after = float(xgb_model.predict_proba(X_after)[0,1])
-
-X_before_row = np.ravel(X_before[0])
-X_after_row  = np.ravel(X_after[0])
-
-shap_values_before = shap_values_before[0]  # fila 0
-shap_values_after  = shap_values_after[0]
-
-# Crear objetos Explanation
-exp_before = shap.Explanation(
-    values=shap_values_before,
-    base_values=explainer.expected_value,  # para KernelExplainer, un único valor
-    data=X_before_row,
-    feature_names=feat_names
-)
-
-exp_after = shap.Explanation(
-    values=shap_values_after,
-    base_values=explainer.expected_value,
-    data=X_after_row,
-    feature_names=feat_names
-)
-
+  
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
 colA, colB = st.columns(2)
@@ -358,6 +323,38 @@ colB.markdown(
     f"Probabilidad modificada<br>{prob_after:.4f}</div>",
     unsafe_allow_html=True
 )
+
+# ----------------------------
+# 2️⃣ Crear SHAP TreeExplainer
+# ----------------------------
+with st.spinner("🧠 Calculando valores SHAP..."):
+
+# Calcula las explicaciones SHAP
+explainer = shap.Explainer(xgb_model, background_array)
+shap_values_before = explainer(X_before)
+shap_values_after = explainer(X_after)
+
+# 👉 Si es clasificación binaria, toma solo la clase positiva (índice 1)
+# Algunas versiones devuelven lista, otras devuelven un objeto con 3 dimensiones
+try:
+    shap_exp_before = shap_values_before[1]  # si es lista
+    shap_exp_after = shap_values_after[1]
+except Exception:
+    # si no es lista, probablemente es un Explanation con varias clases
+    shap_exp_before = shap_values_before[..., 1] if shap_values_before.values.ndim == 3 else shap_values_before
+    shap_exp_after = shap_values_after[..., 1] if shap_values_after.values.ndim == 3 else shap_values_after
+
+# ✅ Ahora graficamos solo una salida (la clase positiva)
+st.subheader("Waterfall antes de cambios")
+fig1, ax1 = plt.subplots(figsize=(8,6))
+shap.plots.waterfall(shap_exp_before[0], max_display=10, show=False)
+st.pyplot(fig1)
+
+st.subheader("Waterfall después de cambios")
+fig2, ax2 = plt.subplots(figsize=(8,6))
+shap.plots.waterfall(shap_exp_after[0], max_display=10, show=False)
+st.pyplot(fig2)
+
 
 # ----------------------------
 # 4️⃣ Waterfall SHAP
