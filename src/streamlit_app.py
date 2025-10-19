@@ -193,6 +193,9 @@ except Exception as e:
 booster = modelo_pipeline.named_steps['modelo'].get_booster()
 booster.set_param('base_score', float(booster.base_score))
 
+if isinstance(base_score, str):
+    base_score = base_score.replace('[','').replace(']','')  # quitar corchetes
+booster.set_param('base_score', float(base_score))
 
 features = df.columns.tolist()
 
