@@ -296,24 +296,23 @@ background_preprocessed = preprocessor.transform(background_clean)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-background_df = pd.DataFrame(background_preprocessed, columns=feat_names)
-X_before  = pd.DataFrame(X_before, columns=feat_names)
-X_after   = pd.DataFrame(X_after, columns=feat_names)
-
-feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
-
 # Función para convertir strings tipo '[1.23E-1]' a float
 def safe_float(x):
     if isinstance(x, str):
         x = x.replace("[", "").replace("]", "")
     return float(x)
 
+# Copias de las filas y background como numpy arrays
+X_before = base_row.values
+X_after  = new_row.values
+background_array = background.values
+
 # Probabilidades
 probs_before = modelo_pipeline.predict_proba(base_row)
 probs_after  = modelo_pipeline.predict_proba(new_row)
 
-prob_before = safe_float(probs_before[0,1])
-prob_after  = safe_float(probs_after[0,1])
+prob_before = float(probs_before[0,1])
+prob_after  = float(probs_after[0,1])
 
 # Mostrar probabilidades
 st.markdown("### 📊 Probabilidades")
@@ -329,17 +328,30 @@ colB.markdown(
     unsafe_allow_html=True
 )
 
-# ============================================================
-# SHAP con KernelExplainer (compatible con cualquier modelo)
-# ============================================================
-
+# SHAP usando KernelExplainer (compatible con cualquier modelo)
 explainer = shap.KernelExplainer(modelo_pipeline.predict_proba, background_array)
 shap_values_before = explainer.shap_values(X_before)
 shap_values_after  = explainer.shap_values(X_after)
 
-# Tomar clase positiva (índice 1)
+# Clase positiva (índice 1)
 shap_exp_before = shap_values_before[1] if isinstance(shap_values_before, list) else shap_values_before
-shap_exp_after  = shap_values_after[1]  if isinstance(shap_values_after, list)  else shap_values_after
+shap_exp_after  = shap_values_after[1]  if isinstance(shap_values_after, list) else shap_values_after
+
+# Gráficos Waterfall
+st.markdown("### 💧 Waterfall SHAP")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Antes de modificaciones")
+    fig1, ax1 = plt.subplots(figsize=(8,6))
+    shap.plots.waterfall(shap_exp_before[0], max_display=10, show=False)
+    st.pyplot(fig1)
+
+with col2:
+    st.subheader("Después de modificaciones")
+    fig2, ax2 = plt.subplots(figsize=(8,6))
+    shap.plots.waterfall(shap_exp_after[0], max_display=10, show=False)
+    st.pyplot(fig2)
 
 # ============================================================
 # Mostrar gráficos Waterfall
