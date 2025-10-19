@@ -293,14 +293,9 @@ X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
-    # Si es un XGBClassifier (de scikit-learn)
-    if hasattr(model, "get_booster"):
-        booster = model.get_booster()
-        explainer = shap.TreeExplainer(booster, data=background_array, feature_perturbation="interventional")
-    else:
-        # fallback si no tiene booster (otros tipos de modelo)
-        explainer = shap.Explainer(model, background_array)
-
+    # Usamos KernelExplainer universal (funciona con XGBoost, LightGBM, scikit, etc.)
+    # Nota: usa pocas muestras de background para que no sea lento
+    explainer = shap.Explainer(model.predict_proba, background_array)
     shap_values_before = explainer(X_before)
     shap_values_after = explainer(X_after)
 
