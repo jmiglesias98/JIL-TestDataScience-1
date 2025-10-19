@@ -293,9 +293,9 @@ X_after = np.array(new_row_preprocessed)
 background_array = np.array(background_preprocessed)
 
 with st.spinner("🧠 Calculando valores SHAP..."):
-    explainer = shap.Explainer(model.predict_proba, background_array)
-    shap_values_before = explainer(X_before)[:, 1]
-    shap_values_after = explainer(X_after)[:, 1]
+    explainer = shap.Explainer(model.predict_proba(x)[:, 1], background_array)
+    shap_values_before = explainer(X_before)
+    shap_values_after = explainer(X_after)
 
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
