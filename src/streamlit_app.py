@@ -307,10 +307,14 @@ with st.spinner("🧠 Calculando valores SHAP..."):
 # Nombres de features
 feat_names = [f.replace("num__", "").replace("cat__", "") for f in preprocessor.get_feature_names_out()]
 
-# Función helper para crear objetos Explanation válidos para waterfall
+# Helper para crear Explanation válido para waterfall
 def make_explanation(shap_values, X_row, feature_names):
-    # Si es objeto Explanation
-    if hasattr(shap_values, "values"):
+    # KernelExplainer devuelve shap_values con .values (n_samples, n_features) o lista por clase
+    if isinstance(shap_values, list):
+        # Seleccionamos clase positiva (1)
+        vals = shap_values[1].values[0]
+        base = shap_values[1].base_values[0]
+    elif hasattr(shap_values, "values"):
         vals = shap_values.values[0]  # primera fila
         base = shap_values.base_values[0]
     else:
@@ -324,7 +328,7 @@ def make_explanation(shap_values, X_row, feature_names):
         feature_names=feature_names
     )
 
-# Crear explicaciones individuales para waterfall
+# Crear explicaciones listas para waterfall
 exp_before = make_explanation(shap_values_before, X_before, feat_names)
 exp_after = make_explanation(shap_values_after, X_after, feat_names)
 
