@@ -24,16 +24,28 @@ El proyecto combina análisis exploratorio de datos, construcción y evaluación
 
 ## Notebooks
 
-Scripts utilizados en el desarrollo de la solución.
-
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
 | `01_classification_analysis_test_1.ipynb`  | Notebook que contiene el desarrollo del caso práctico y la argumentación del mismo. |
 | `01_classification_analysis_test_1.html`   | Notebook renderizado. |
 
-## Devops
+## Modelos
 
-A continuación se enumeran los distintos scripts y utilizados en la operativización del producto.
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+
+| `mejor_modelo_20251016.joblib` | Modelo ganador - XGBoost con AUC-ROC del 93%. |
+
+## Datos
+
+| Archivo                     | Descripción |
+|-----------------------------|-------------|
+
+| `bank-full.csv` | Fichero sin tratar descargado de kaggle que sirve como starting point de este caso práctico. |
+| `clientes_20251016.csv` | Fichero equivalente al anterior con la diferencia de que no presenta la variable objetivo.  |
+| `clientes_20251016_predicciones.csv` | Salida obtenida de la ejecución del modelo productivizado. |
+
+## Devops
 
 | Archivo                     | Descripción |
 |-----------------------------|-------------|
@@ -46,32 +58,7 @@ A continuación se enumeran los distintos scripts y utilizados en la operativiza
 | `streamlit_app.py`          | Aplicación web interactiva usando Streamlit para que el equipo de Marketing pueda realizar simulaciones What-If. |
 | `streamlit_app.py`          | Aplicación web interactiva usando Streamlit para que el equipo de Marketing pueda realizar simulaciones What-If. |
 
-## Modelos
-
-En la siguiente tabla se enumeran los modelos a productivizar.
-
-| Archivo                     | Descripción |
-|-----------------------------|-------------|
-
-| `mejor_modelo_20251016.joblib` | Modelo ganador - XGBoost con AUC-ROC del 93%. |
-
-## Datos
-
-Datos de entrada y salida utilizados en el caso práctico.
-
-| Archivo                     | Descripción |
-|-----------------------------|-------------|
-
-| `bank-full.csv` | Fichero sin tratar descargado de kaggle que sirve como starting point de este caso práctico. |
-| `clientes_20251016.csv` | Fichero equivalente al anterior con la diferencia de que no presenta la variable objetivo.  |
-| `clientes_20251016_predicciones.csv` | Salida obtenida de la ejecución del modelo productivizado. |
-
-## Requisitos
-
-- Python 3.8 o superior
-- Docker
-
-## Instalación y Ejecución
+## Instalación y ejecución con docker
 
 | Paso | Comando |
 |:----:|:-------|
@@ -82,3 +69,8 @@ Datos de entrada y salida utilizados en el caso práctico.
 | Realizar predicciones sobre un CSV de clientes | `curl -X POST "http://localhost:8000/predict_csv" ^ -F "file=@C:\Users\Juanmi Iglesias\Desktop\JIL-TestDataScience-1-main\data\raw\clientes_20251016.csv" ^ -o "C:\Users\Juanmi Iglesias\Desktop\JIL-TestDataScience-1-main\data\processed\clientes_20251016_predicciones.csv"` |
 
 NOTA: Se debe sustituir C:\Users\Juanmi Iglesias\Desktop\ por la ruta en la que cada uno vaya a trabajar.
+
+## Requisitos
+
+- Python 3.8 o superior
+- Docker
